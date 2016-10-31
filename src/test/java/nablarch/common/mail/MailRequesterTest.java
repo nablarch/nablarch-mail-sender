@@ -1,7 +1,6 @@
 package nablarch.common.mail;
 
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
@@ -78,10 +77,10 @@ public class MailRequesterTest extends MailTestSupport {
 
     private static String lang = "ja";
 
-    private static String subjectTemplate = "{1}について";
+    private static String subjectTemplate = "{1}について{option}";
 
     private static String mailBodyTemplate = "{1}は、申請番号{2}で申請されました。" + LINE_SEPARATOR
-            + "{3}は速やかに{1}を承認してください。";
+            + "{3}は速やかに{1}を承認してください。{option}";
 
     @Override
     @Before
@@ -654,6 +653,7 @@ public class MailRequesterTest extends MailTestSupport {
             tctx.setReplaceKeyValue("1", "申請書");
             tctx.setReplaceKeyValue("2", "00001");
             tctx.setReplaceKeyValue("3", "承認者");
+            tctx.setReplaceKeyValue("option", null);
 
             //送信要求!
             String mailRequestId = requester.requestToSend(tctx);
@@ -812,6 +812,53 @@ public class MailRequesterTest extends MailTestSupport {
             assertThat(e.getMessage(), is("mail template was not found. mailTemplateId = ["
                     + mailTemplateId + "], lang = [" + lang_en + "]"));
 
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    @Test
+    public void testSetNullToTemplateName_shouldThrowException() throws Exception {
+        MailRequester requester = MailUtil.getMailRequester();
+
+        db.beginTransaction();
+        try {
+            // データ準備
+            TemplateMailContext tctx = new TemplateMailContext();
+            tctx.setFrom(from);
+            tctx.addTo(to1);
+            tctx.setTemplateId(null);
+
+            requester.requestToSend(tctx);
+            fail();
+        } catch (IllegalArgumentException e) {
+            // success
+            assertThat(e.getMessage(), is("mail template was not found. mailTemplateId = [null], lang = [null]"));
+
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    @Test
+    public void testSetNullToReplaceKye_shouldThrowException() throws Exception {
+        MailRequester requester = MailUtil.getMailRequester();
+
+        db.beginTransaction();
+        try {
+            // データ準備
+            TemplateMailContext tctx = new TemplateMailContext();
+            tctx.setFrom(from);
+            tctx.addTo(to1);
+            tctx.setTemplateId(mailTemplateId);
+            tctx.setLang("ja");
+            tctx.setReplaceKeyValue(null, "dummy");
+
+            requester.requestToSend(tctx);
+            fail();
+
+        } catch (IllegalArgumentException e) {
+            assertThat(e.getMessage(), is("replace key must not be null"));
         } finally {
             db.endTransaction();
         }
