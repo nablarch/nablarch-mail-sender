@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component-configuration
+    xmlns="http://tis.co.jp/nablarch/component-configuration" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://tis.co.jp/nablarch/component-configuration">
+
+    <!-- 正常系の設定ファイルをインポート -->
+    <import file="nablarch/common/mail/MailSenderTest.xml" />
+
+    <!-- 接続タイムアウト値をオーバーライド（確実にタイムアウトを発生させるために接続ポートも変える） -->
+    <component name="mailSessionConfig" class="nablarch.common.mail.MailSessionConfig">
+        <property name="mailSmtpHost" value="${mail.smtp.host}" />
+        <property name="mailHost" value="${mail.host}" />
+        <property name="mailSmtpPort" value="27" />
+        <property name="mailSmtpConnectionTimeout" value="1" />
+        <property name="mailSmtpTimeout" value="${mail.smtp.timeout}" />
+    </component>
+</component-configuration>
+ 
