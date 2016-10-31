@@ -143,7 +143,12 @@ public class MailRequester {
     private String replaceTemplateString(Map<String, String> replaceKeyValue,
             String targetStr) {
         for (Entry<String, String> entry : replaceKeyValue.entrySet()) {
-            targetStr = targetStr.replace('{' + entry.getKey() + '}', entry.getValue());
+            final String key = entry.getKey();
+            if (key == null) {
+                throw new IllegalArgumentException("replace key must not be null");
+            }
+            final String value = entry.getValue();
+            targetStr = targetStr.replace('{' + key + '}', value == null ? "" : value);
         }
         return targetStr;
     }
