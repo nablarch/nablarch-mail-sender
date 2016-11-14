@@ -10,12 +10,15 @@ buildscript {
   }
   dependencies {
     classpath "com.nablarch.dev:nablarch-gradle-plugin:${nablarchGradlePluginVersion}"
+    classpath "net.saliman:gradle-cobertura-plugin:${coberturaPluginVersion}"
   }
 }
 apply plugin: 'com.nablarch.dev.nablarch-build'
 apply plugin: 'com.nablarch.dev.nablarch-maven-deploy'
 apply plugin: 'com.nablarch.dev.nablarch-sonarqube'
 apply plugin: 'com.nablarch.dev.nablarch-version'
+apply from: 'https://github.com/nablarch/nablarch-gradle-plugin/blob/develop/scripts/cobertura/cobertura-0.0.1.gradle?raw=true'
+
 sourceCompatibility = JavaVersion.VERSION_1_6
 targetCompatibility = JavaVersion.VERSION_1_6
 
@@ -38,6 +41,12 @@ dependencies {
 
   testRuntime "com.nablarch.framework:nablarch-common-jdbc:${nablarchCommonJdbcVersion}"
   testRuntime "com.nablarch.framework:nablarch-common-idgenerator-jdbc:${nablarchCommonIdgeneratorJdbcVersion}"
+
+  cobertura ("net.sourceforge.cobertura:cobertura:1.9.4")
+}
+
+tasks.sonarRunner {
+  dependsOn = ['coverage']
 }
 
 task wrapper(type: Wrapper) {
