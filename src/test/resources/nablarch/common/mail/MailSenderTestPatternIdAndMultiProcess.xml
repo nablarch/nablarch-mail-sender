@@ -34,11 +34,11 @@
         <property name="mailBodyColumnName" value="MAIL_BODY" />
         <!-- メール送信要求管理テーブルのパターンIDカラムの名前 -->
         <property name="mailSendPatternIdColumnName"  value="MAIL_SEND_PATTERN_ID" />
-        <!-- メール送信要求管理テーブルのメール送信バッチIDのカラムの名前 -->
-        <property name="sendBatchIdColumnName" value="BATCH_ID" />
+        <!-- メール送信要求管理テーブルのメール送信バッチのプロセスIDのカラムの名前 -->
+        <property name="sendProcessIdColumnName" value="BATCH_ID" />
     </component>
 
-    <!-- 処理するバッチID更新用のトランザクション -->
+    <!-- 処理するバッチのプロセスID更新用のトランザクション -->
     <component name="mailMultiProcessTransaction" class="nablarch.core.db.transaction.SimpleDbTransactionManager">
         <property name="connectionFactory" ref="connectionFactory" />
         <property name="transactionFactory" ref="jdbcTransactionFactory" />

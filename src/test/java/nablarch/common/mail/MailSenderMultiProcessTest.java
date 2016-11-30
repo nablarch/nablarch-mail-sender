@@ -151,35 +151,31 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         assertThat("レコード取得数", mailRequestList.size(), is(1));
         assertThat("ステータスが更新されているはず", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
         assertThat("送信日時が登録されているはず", mailRequestList.get(0).sendDatetime, notNullValue());
-        assertThat("バッチIDが登録されているはず", mailRequestList.get(0).batchId, notNullValue());
+        assertThat("プロセスIDが登録されているはず", mailRequestList.get(0).batchId, notNullValue());
     }
 
     /**
      * {@link Main#execute(CommandLine)}のテスト。
      * <p/>
      * マルチプロセス用の処理が正常終了する場合のテスト<br/>
-     * 送信済み、別プロセスが処理中のものを送信しない。
+     * 送信済みのものを送信しない。
      *
      * @throws Exception
      */
     @Test
-    public void testExecuteDoNotSend() throws Exception {
+    public void testExecuteDoNotSendAlreadySent() throws Exception {
 
         // データ準備
         String mailRequestId = "1";
-        String mailRequestId2 = "2";
         String subject = "正常系1";
         String otherBatchId = UUID.randomUUID().toString();
 
         VariousDbTestHelper.setUpTable(
                 new MailRequestMultiProcess(mailRequestId, subject, from, replyTo, returnPath, charset,
-                        mailConfig.getStatusSent(), SystemTimeUtil.getTimestamp(), null, mailBody, null),
-                new MailRequestMultiProcess(mailRequestId2, subject, from, replyTo, returnPath, charset,
-                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, otherBatchId));
+                        mailConfig.getStatusSent(), SystemTimeUtil.getTimestamp(), null, mailBody, null));
 
         VariousDbTestHelper.setUpTable(
-                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeCC(), cc1),
-                new MailRecipient(mailRequestId2, 1L, mailConfig.getRecipientTypeCC(), cc1));
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeCC(), cc1));
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
@@ -193,18 +189,51 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
 
         // DBの検証（ステータスと送信日時）
         List<MailRequestMultiProcess> mailRequestList = VariousDbTestHelper.findAll(MailRequestMultiProcess.class);
-        assertThat("レコード取得数", mailRequestList.size(), is(2));
-        for (MailRequestMultiProcess request : mailRequestList) {
-            if (request.mailRequestId.equals(mailRequestId)) {
-                assertThat("ステータスが更新されてないはず", request.status, is(mailConfig.getStatusSent()));
-                assertThat("送信日時が登録されてないはず", request.sendDatetime, nullValue());
-                assertThat("バッチIDが登録されていないはず", request.batchId, nullValue());
-            } else if (request.mailRequestId.equals(mailRequestId2)) {
-                assertThat("ステータスが更新されないはず", request.status, is(mailConfig.getStatusUnsent()));
-                assertThat("送信日時が登録されないはず", request.sendDatetime, nullValue());
-                assertThat("バッチIDが登録されているはず", request.batchId, is(otherBatchId));
-            }
-        }
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが更新されてないはず", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
+        assertThat("送信日時が登録されてないはず", mailRequestList.get(0).sendDatetime, nullValue());
+        assertThat("プロセスIDが登録されていないはず", mailRequestList.get(0).batchId, nullValue());
+    }
+
+    /**
+     * {@link Main#execute(CommandLine)}のテスト。
+     * <p/>
+     * マルチプロセス用の処理が正常終了する場合のテスト<br/>
+     * 別プロセスが処理中のものを送信しない。
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testExecuteDoNotSendOtherProcessSending() throws Exception {
+
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "正常系1";
+        String otherBatchId = UUID.randomUUID().toString();
+
+        VariousDbTestHelper.setUpTable(
+                new MailRequestMultiProcess(mailRequestId, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, otherBatchId));
+
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeCC(), cc1));
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTestMultiProcess.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        int execute = Main.execute(commandLine);
+        assertThat("正常終了なので戻り値は0となる。", execute, is(0));
+
+        // ログ出力確認
+        assertLog("メール送信要求が 0 件あります。");
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequestMultiProcess> mailRequestList = VariousDbTestHelper.findAll(MailRequestMultiProcess.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが更新されないはず", mailRequestList.get(0).status, is(mailConfig.getStatusUnsent()));
+        assertThat("送信日時が登録されないはず", mailRequestList.get(0).sendDatetime, nullValue());
+        assertThat("プロセスIDが登録されているはず", mailRequestList.get(0).batchId, is(otherBatchId));
     }
 
     /**
@@ -415,7 +444,7 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
      * {@link Main#execute(CommandLine)}のテスト。
      * <p/>
      * 処理が異常終了する場合のテスト<br/>
-     * マルチプロセスの設定がされているがバッチIDを指定しないケース。
+     * マルチプロセスの設定がされているがプロセスIDを指定しないケース。
      *
      * @throws Exception
      */
@@ -443,6 +472,6 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         Main.execute(commandLine);
 
         // ログ出力確認
-        assertLog("sendBatchId must not be null if you use in multi process.");
+        assertLog("sendProcessId must not be null if you use in multi process.");
     }
 }

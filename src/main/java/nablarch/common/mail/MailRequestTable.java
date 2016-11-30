@@ -57,8 +57,8 @@ public class MailRequestTable implements Initializable {
     /** メール送信パターンIDカラム名 */
     private String mailSendPatternIdColumnName;
 
-    /** メール送信バッチIDのカラム名 */
-    private String sendBatchIdColumnName;
+    /** メール送信バッチのプロセスIDのカラム名 */
+    private String sendProcessIdColumnName;
 
     /** メール送信要求を登録するSQL */
     private String insertSql;
@@ -75,8 +75,8 @@ public class MailRequestTable implements Initializable {
     /** メール送信失敗時のステータスを更新するSQL */
     private String updateFailureStatusSql;
 
-    /** メール送信バッチIDを更新するSQL */
-    private String updateSendBatchIdSql;
+    /** メール送信バッチのプロセスIDを更新するSQL */
+    private String updateSendProcessIdSql;
 
     /** メール関連のコード値を保持するデータオブジェクト */
     private MailConfig mailConfig;
@@ -190,12 +190,12 @@ public class MailRequestTable implements Initializable {
     }
 
     /**
-     * 送信するバッチIDのカラム名を設定する。
+     * 送信するバッチのプロセスIDのカラム名を設定する。
      *
-     * @param sendBatchIdColumnName 送信するバッチIDのカラム名
+     * @param sendProcessIdColumnName 送信するバッチのプロセスIDのカラム名
      */
-    public void setSendBatchIdColumnName(String sendBatchIdColumnName) {
-        this.sendBatchIdColumnName = sendBatchIdColumnName;
+    public void setSendProcessIdColumnName(String sendProcessIdColumnName) {
+        this.sendProcessIdColumnName = sendProcessIdColumnName;
     }
 
     /**
@@ -268,10 +268,10 @@ public class MailRequestTable implements Initializable {
      * 処理対象データを取得する{@link SqlPStatement}を生成する。
      *
      * @param mailSendPatternId メール送信パターンID
-     * @param sendBatchId メール送信バッチID
+     * @param sendProcessId メール送信バッチのプロセスID
      * @return 処理対象データを取得するステートメント
      */
-    public SqlPStatement createReaderStatement(String mailSendPatternId, String sendBatchId) {
+    public SqlPStatement createReaderStatement(String mailSendPatternId, String sendProcessId) {
         AppDbConnection connection = DbConnectionContext.getConnection();
         SqlPStatement statement = connection.prepareStatement(selectUnsentSql);
         int paramPosition = 1;
@@ -279,11 +279,11 @@ public class MailRequestTable implements Initializable {
         if (StringUtil.hasValue(mailSendPatternId)) {
             statement.setString(paramPosition++, mailSendPatternId);
         }
-        if (StringUtil.hasValue(sendBatchIdColumnName)) {
-            if (StringUtil.hasValue(sendBatchId)) {
-                statement.setString(paramPosition++, sendBatchId);
+        if (StringUtil.hasValue(sendProcessIdColumnName)) {
+            if (StringUtil.hasValue(sendProcessId)) {
+                statement.setString(paramPosition++, sendProcessId);
             } else {
-                throw new IllegalArgumentException("sendBatchId must not be null if you use in multi process.");
+                throw new IllegalArgumentException("sendProcessId must not be null if you use in multi process.");
             }
         }
         return statement;
@@ -325,20 +325,20 @@ public class MailRequestTable implements Initializable {
     }
 
     /**
-     * メール送信バッチIDを更新する。
+     * メール送信バッチのプロセスIDを更新する。<p/>
      * マルチプロセス用の設定がされている場合のみ更新し、
      * 別トランザクションで実行する。
      *
-     * @param sendBatchId 更新するメール送信バッチID
+     * @param sendProcessId 更新するメール送信バッチのプロセスID
      */
-    public void updateSendBatchId(final String sendBatchId) {
-        if (StringUtil.hasValue(sendBatchIdColumnName)) {
+    public void updateSendProcessId(final String sendProcessId) {
+        if (StringUtil.hasValue(sendProcessIdColumnName)) {
             SimpleDbTransactionManager manager = SystemRepository.get("mailMultiProcessTransaction");
             new SimpleDbTransactionExecutor<Void>(manager) {
                 @Override
                 public Void execute(AppDbConnection appDbConnection) {
-                    SqlPStatement statement = appDbConnection.prepareStatement(updateSendBatchIdSql);
-                    statement.setString(1, sendBatchId);
+                    SqlPStatement statement = appDbConnection.prepareStatement(updateSendProcessIdSql);
+                    statement.setString(1, sendProcessId);
                     statement.setString(2, mailConfig.getStatusUnsent());
                     statement.executeUpdate();
                     return null;
@@ -363,7 +363,7 @@ public class MailRequestTable implements Initializable {
         selectUnsentSql = createSelectUnsentSql();
         updateStatusSql = createUpdateStatus();
         updateFailureStatusSql = createUpdateFailureStatusSql();
-        updateSendBatchIdSql = createUpdateSendBatchIdSql();
+        updateSendProcessIdSql = createUpdateSendProcessIdSql();
     }
 
     /**
@@ -386,8 +386,8 @@ public class MailRequestTable implements Initializable {
         if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
             sql += "AND " + mailSendPatternIdColumnName + " = ? ";
         }
-        if (StringUtil.hasValue(sendBatchIdColumnName)) {
-            sql += "AND " + sendBatchIdColumnName + " = ? ";
+        if (StringUtil.hasValue(sendProcessIdColumnName)) {
+            sql += "AND " + sendProcessIdColumnName + " = ? ";
         }
         sql += "ORDER BY " + mailRequestIdColumnName;
         return sql;
@@ -407,8 +407,8 @@ public class MailRequestTable implements Initializable {
         if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
             sql += "AND " + mailSendPatternIdColumnName + " = ? ";
         }
-        if (StringUtil.hasValue(sendBatchIdColumnName)) {
-            sql += "AND " + sendBatchIdColumnName + " IS NULL ";
+        if (StringUtil.hasValue(sendProcessIdColumnName)) {
+            sql += "AND " + sendProcessIdColumnName + " IS NULL ";
         }
         return sql;
     }
@@ -468,15 +468,15 @@ public class MailRequestTable implements Initializable {
     }
 
     /**
-     * 未処理データのメール送信バッチIDを更新するSQLを生成する。
+     * 未処理データのメール送信バッチのプロセスIDを更新するSQLを生成する。
      *
-     * @return 未処理データのメール送信バッチIDを更新するSQL
+     * @return 未処理データのメール送信バッチのプロセスIDを更新するSQL
      */
-    private String createUpdateSendBatchIdSql() {
+    private String createUpdateSendProcessIdSql() {
         String update = "UPDATE " + tableName
-                + " SET " + sendBatchIdColumnName + " = ?"
+                + " SET " + sendProcessIdColumnName + " = ?"
                 + " WHERE " + statusColumnName + " = ? "
-                + " AND " + sendBatchIdColumnName + " IS NULL ";
+                + " AND " + sendProcessIdColumnName + " IS NULL ";
         return update;
     }
 
