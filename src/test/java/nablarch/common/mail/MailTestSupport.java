@@ -77,7 +77,6 @@ public class MailTestSupport {
 
     @BeforeClass
     public static void beforeClass() {
-
         VariousDbTestHelper.createTable(MailRequest.class);
         VariousDbTestHelper.createTable(MailRequestPattern.class);
         VariousDbTestHelper.createTable(MailRecipient.class);
@@ -86,6 +85,7 @@ public class MailTestSupport {
         VariousDbTestHelper.createTable(MailSbnTable.class);
         VariousDbTestHelper.createTable(MailTestMessage.class);
         VariousDbTestHelper.createTable(MailBatchRequest.class);
+        VariousDbTestHelper.createTable(MailRequestMultiProcess.class);
 
         sessionProperties.setProperty("mail.smtp.host", "localhost");
         sessionProperties.setProperty("mail.host", "localhost");
@@ -102,6 +102,7 @@ public class MailTestSupport {
         VariousDbTestHelper.delete(MailAttachedFile.class);
         VariousDbTestHelper.delete(MailTemplate.class);
         VariousDbTestHelper.delete(MailSbnTable.class);
+        VariousDbTestHelper.delete(MailRequestMultiProcess.class);
 
         VariousDbTestHelper.setUpTable(new MailSbnTable("99", 0L));
 

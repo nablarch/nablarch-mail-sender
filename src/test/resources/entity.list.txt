@@ -1,0 +1,9 @@
+nablarch.common.mail.MailTemplate
+nablarch.common.mail.MailAttachedFile
+nablarch.common.mail.MailRecipient
+nablarch.common.mail.MailRequest
+nablarch.common.mail.MailRequestPattern
+nablarch.common.mail.MailSbnTable
+nablarch.common.mail.MailBatchRequest
+nablarch.common.mail.MailTestMessage
+nablarch.common.mail.MailRequestMultiProcess

@@ -6,6 +6,9 @@ import nablarch.core.db.connection.DbConnectionContext;
 import nablarch.core.db.statement.SqlPStatement;
 import nablarch.core.db.statement.SqlResultSet;
 import nablarch.core.db.statement.SqlRow;
+import nablarch.core.db.transaction.SimpleDbTransactionExecutor;
+import nablarch.core.db.transaction.SimpleDbTransactionManager;
+import nablarch.core.repository.SystemRepository;
 import nablarch.core.repository.initialization.Initializable;
 import nablarch.core.util.StringUtil;
 import nablarch.core.util.annotation.Published;
@@ -54,6 +57,9 @@ public class MailRequestTable implements Initializable {
     /** メール送信パターンIDカラム名 */
     private String mailSendPatternIdColumnName;
 
+    /** メール送信バッチのインスタンスIDのカラム名 */
+    private String sendBatchInstanceIdColumnName;
+
     /** メール送信要求を登録するSQL */
     private String insertSql;
 
@@ -68,6 +74,9 @@ public class MailRequestTable implements Initializable {
 
     /** メール送信失敗時のステータスを更新するSQL */
     private String updateFailureStatusSql;
+
+    /** メール送信バッチのインスタンスIDを更新するSQL */
+    private String updateSendBatchInstanceIdSql;
 
     /** メール関連のコード値を保持するデータオブジェクト */
     private MailConfig mailConfig;
@@ -181,6 +190,15 @@ public class MailRequestTable implements Initializable {
     }
 
     /**
+     * 送信するバッチのインスタンスIDのカラム名を設定する。
+     *
+     * @param sendBatchInstanceIdColumnName 送信するバッチのインスタンスIDのカラム名
+     */
+    public void setSendBatchInstanceIdColumnName(String sendBatchInstanceIdColumnName) {
+        this.sendBatchInstanceIdColumnName = sendBatchInstanceIdColumnName;
+    }
+
+    /**
      * メール関連のコード値を保持するデータオブジェクトを設定する。
      *
      * @param mailConfig メール関連のコード値を保持するデータオブジェクト
@@ -237,17 +255,32 @@ public class MailRequestTable implements Initializable {
     }
 
     /**
-     * 処理対象データをし取得する{@link SqlPStatement}を生成する。
+     * 処理対象データを取得する{@link SqlPStatement}を生成する。
      *
      * @param mailSendPatternId メール送信パターンID
      * @return 処理対象データを取得するステートメント
      */
     public SqlPStatement createReaderStatement(String mailSendPatternId) {
+        return createReaderStatement(mailSendPatternId, null);
+    }
+
+    /**
+     * 処理対象データを取得する{@link SqlPStatement}を生成する。
+     *
+     * @param mailSendPatternId メール送信パターンID
+     * @param sendBatchInstanceId メール送信バッチID
+     * @return 処理対象データを取得するステートメント
+     */
+    public SqlPStatement createReaderStatement(String mailSendPatternId, String sendBatchInstanceId) {
         AppDbConnection connection = DbConnectionContext.getConnection();
         SqlPStatement statement = connection.prepareStatement(selectUnsentSql);
-        statement.setString(1, mailConfig.getStatusUnsent());
+        int paramPosition = 1;
+        statement.setString(paramPosition++, mailConfig.getStatusUnsent());
         if (StringUtil.hasValue(mailSendPatternId)) {
-            statement.setString(2, mailSendPatternId);
+            statement.setString(paramPosition++, mailSendPatternId);
+        }
+        if (StringUtil.hasValue(sendBatchInstanceIdColumnName) && StringUtil.hasValue(sendBatchInstanceId)) {
+            statement.setString(paramPosition++, sendBatchInstanceId);
         }
         return statement;
     }
@@ -287,6 +320,22 @@ public class MailRequestTable implements Initializable {
         statement.executeUpdate();
     }
 
+    public void updateSendBatchInstanceId(final String sendBatchInstanceId) {
+        if (StringUtil.hasValue(sendBatchInstanceIdColumnName)) {
+            SimpleDbTransactionManager manager = SystemRepository.get("mailMultiProcessTransaction");
+            new SimpleDbTransactionExecutor<Void>(manager) {
+                @Override
+                public Void execute(AppDbConnection appDbConnection) {
+                    SqlPStatement statement = appDbConnection.prepareStatement(updateSendBatchInstanceIdSql);
+                    statement.setString(1, sendBatchInstanceId);
+                    statement.setString(2, mailConfig.getStatusUnsent());
+                    statement.executeUpdate();
+                    return null;
+                }
+            }.doTransaction();
+        }
+    }
+
     /**
      * SQLの取得結果の1レコードをMailRequestTable.MailRequestに変換する。
      * @param data メール送信要求1レコード
@@ -303,6 +352,7 @@ public class MailRequestTable implements Initializable {
         selectUnsentSql = createSelectUnsentSql();
         updateStatusSql = createUpdateStatus();
         updateFailureStatusSql = createUpdateFailureStatusSql();
+        updateSendBatchInstanceIdSql = createUpdateSendBatchInstanceIdSql();
     }
 
     /**
@@ -325,6 +375,9 @@ public class MailRequestTable implements Initializable {
         if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
             sql += "AND " + mailSendPatternIdColumnName + " = ? ";
         }
+        if (StringUtil.hasValue(sendBatchInstanceIdColumnName)) {
+            sql += "AND " + sendBatchInstanceIdColumnName + " = ? ";
+        }
         sql += "ORDER BY " + mailRequestIdColumnName;
         return sql;
     }
@@ -341,7 +394,10 @@ public class MailRequestTable implements Initializable {
                 + " WHERE "
                 + statusColumnName + " = ? ";
         if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
-            sql += "AND " + mailSendPatternIdColumnName + " = ?";
+            sql += "AND " + mailSendPatternIdColumnName + " = ? ";
+        }
+        if (StringUtil.hasValue(sendBatchInstanceIdColumnName)) {
+            sql += "AND " + sendBatchInstanceIdColumnName + " IS NULL ";
         }
         return sql;
     }
@@ -398,6 +454,19 @@ public class MailRequestTable implements Initializable {
             values += ",?";
         }
         return insert + ") values (" + values + ')';
+    }
+
+    /**
+     * 未処理データのメール送信バッチIDを更新するSQLを生成する。
+     *
+     * @return 未処理データのメール送信バッチIDを更新するSQL
+     */
+    private String createUpdateSendBatchInstanceIdSql() {
+        String update = "UPDATE " + tableName
+                + " SET " + sendBatchInstanceIdColumnName + " = ?"
+                + " WHERE " + statusColumnName + " = ? "
+                + " AND " + sendBatchInstanceIdColumnName + " IS NULL ";
+        return update;
     }
 
     /**
