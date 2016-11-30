@@ -9,7 +9,6 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.UUID;
 
 import javax.mail.Address;
 import javax.mail.Authenticator;
@@ -409,111 +408,6 @@ public class MailSenderTest extends MailTestSupport {
         assertThat("レコード取得数", mailRequestList.size(), is(1));
         assertThat("ステータスが更新されているはず", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
         assertThat("送信日時が登録されているはず", mailRequestList.get(0).sendDatetime, is(notNullValue()));
-    }
-
-    /**
-     * {@link Main#execute(CommandLine)}のテスト。
-     * <p/>
-     * マルチプロセス用の処理が正常終了する場合のテスト<br/>
-     * <br/>
-     * TO:0件,CC:複数,BCC1件,添付ファイルなし
-     *
-     * @throws Exception
-     */
-    @Test
-    public void testExecuteNormalEndMultiProcess() throws Exception {
-
-        // データ準備
-        String mailRequestId = "1";
-        String mailRequestId2 = "2";
-        String subject = "正常系1";
-        String otherBatchId = UUID.randomUUID().toString();
-
-        VariousDbTestHelper.setUpTable(
-                new MailRequestMultiProcess(mailRequestId, subject, from, replyTo, returnPath, charset,
-                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, null),
-                new MailRequestMultiProcess(mailRequestId2, subject, from, replyTo, returnPath, charset,
-                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, otherBatchId));
-
-        VariousDbTestHelper.setUpTable(
-                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeCC(), cc1),
-                new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeCC(), cc2),
-                new MailRecipient(mailRequestId, 3L, mailConfig.getRecipientTypeCC(), cc3),
-                new MailRecipient(mailRequestId, 4L, mailConfig.getRecipientTypeBCC(), bcc1),
-                new MailRecipient(mailRequestId2, 1L, mailConfig.getRecipientTypeCC(), cc1));
-
-        // バッチ実行
-        CommandLine commandLine = new CommandLine("-diConfig",
-                "nablarch/common/mail/MailSenderTestMultiProcess.xml", "-requestPath",
-                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
-        int execute = Main.execute(commandLine);
-        assertThat("正常終了なので戻り値は0となる。", execute, is(0));
-
-        // ログ出力確認
-        assertLog("メール送信要求が 1 件あります。");
-        assertLog("メールを送信しました。 mailRequestId=[" + mailRequestId + "]");
-
-        // bcc1でメールを受信
-        Session session = Session.getInstance(sessionProperties, new Authenticator() {
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication("bcc1", "default");
-            }
-        });
-        session.setDebug(true);
-        Store store = session.getStore("pop3");
-        store.connect();
-        Folder folder = openFolder(store);
-        Message[] messages = folder.getMessages();
-        assertThat("メールが1通とどいているはず", messages.length, is(1));
-
-        // メールの検証
-        Message message = messages[0];
-        Address[] messageFrom = message.getFrom();
-        assertThat("fromアドレスの数", messageFrom.length, is(1));
-        assertThat("fromアドレス", ((InternetAddress) messageFrom[0]).getAddress(), is(from));
-
-        Address[] messageTO = message.getRecipients(RecipientType.TO);
-        assertNull("TOアドレス", messageTO);
-
-        Address[] messageCC = message.getRecipients(RecipientType.CC);
-        assertThat("CCアドレスの数", messageCC.length, is(3));
-        assertThat("CCアドレス1", ((InternetAddress) messageCC[0]).getAddress(), is(cc1));
-        assertThat("CCアドレス2", ((InternetAddress) messageCC[1]).getAddress(), is(cc2));
-        assertThat("CCアドレス3", ((InternetAddress) messageCC[2]).getAddress(), is(cc3));
-
-        // BCCはアサートできない
-
-        Address[] messageReplyTo = message.getReplyTo();
-        assertThat("ReplyToの数", messageReplyTo.length, is(1));
-        assertThat("ReplyToアドレス", ((InternetAddress) messageReplyTo[0]).getAddress(), is(replyTo));
-
-        String[] messageReturnPath = message.getHeader("Return-Path");
-        assertThat("RetrunPathの数", messageReturnPath.length, is(1));
-        assertThat("RetrunPathアドレス", messageReturnPath[0], is("<" + returnPath + ">"));
-
-        String messageSubject = message.getSubject();
-        assertThat("件名", messageSubject, is(subject));
-
-        assertThat("Content-Type", message.getContentType(), containsString("text/plain"));
-        assertThat("charset", message.getContentType(), containsString(charset));
-
-        assertThat("添付ファイルなしなので", message.getContent(), is(instanceOf(String.class)));
-        assertThat("本文", (String) message.getContent(), is(mailBody));
-
-        // DBの検証（ステータスと送信日時）
-        List<MailRequestMultiProcess> mailRequestList = VariousDbTestHelper.findAll(MailRequestMultiProcess.class);
-        assertThat("レコード取得数", mailRequestList.size(), is(2));
-        for (MailRequestMultiProcess request : mailRequestList) {
-            if (request.mailRequestId.equals(mailRequestId)) {
-                assertThat("ステータスが更新されているはず", request.status, is(mailConfig.getStatusSent()));
-                assertThat("送信日時が登録されているはず", request.sendDatetime, notNullValue());
-                assertThat("バッチIDが登録されているはず", request.batchId, notNullValue());
-            } else if (request.mailRequestId.equals(mailRequestId2)) {
-                assertThat("ステータスが更新されないはず", request.status, is(mailConfig.getStatusUnsent()));
-                assertThat("送信日時が登録されないはず", request.sendDatetime, nullValue());
-                assertThat("バッチIDが登録されているはず", request.batchId, is(otherBatchId));
-            }
-        }
     }
 
     /**

@@ -57,8 +57,8 @@ public class MailRequestTable implements Initializable {
     /** メール送信パターンIDカラム名 */
     private String mailSendPatternIdColumnName;
 
-    /** メール送信バッチのインスタンスIDのカラム名 */
-    private String sendBatchInstanceIdColumnName;
+    /** メール送信バッチIDのカラム名 */
+    private String sendBatchIdColumnName;
 
     /** メール送信要求を登録するSQL */
     private String insertSql;
@@ -75,8 +75,8 @@ public class MailRequestTable implements Initializable {
     /** メール送信失敗時のステータスを更新するSQL */
     private String updateFailureStatusSql;
 
-    /** メール送信バッチのインスタンスIDを更新するSQL */
-    private String updateSendBatchInstanceIdSql;
+    /** メール送信バッチIDを更新するSQL */
+    private String updateSendBatchIdSql;
 
     /** メール関連のコード値を保持するデータオブジェクト */
     private MailConfig mailConfig;
@@ -190,12 +190,12 @@ public class MailRequestTable implements Initializable {
     }
 
     /**
-     * 送信するバッチのインスタンスIDのカラム名を設定する。
+     * 送信するバッチIDのカラム名を設定する。
      *
-     * @param sendBatchInstanceIdColumnName 送信するバッチのインスタンスIDのカラム名
+     * @param sendBatchIdColumnName 送信するバッチIDのカラム名
      */
-    public void setSendBatchInstanceIdColumnName(String sendBatchInstanceIdColumnName) {
-        this.sendBatchInstanceIdColumnName = sendBatchInstanceIdColumnName;
+    public void setSendBatchIdColumnName(String sendBatchIdColumnName) {
+        this.sendBatchIdColumnName = sendBatchIdColumnName;
     }
 
     /**
@@ -268,10 +268,10 @@ public class MailRequestTable implements Initializable {
      * 処理対象データを取得する{@link SqlPStatement}を生成する。
      *
      * @param mailSendPatternId メール送信パターンID
-     * @param sendBatchInstanceId メール送信バッチID
+     * @param sendBatchId メール送信バッチID
      * @return 処理対象データを取得するステートメント
      */
-    public SqlPStatement createReaderStatement(String mailSendPatternId, String sendBatchInstanceId) {
+    public SqlPStatement createReaderStatement(String mailSendPatternId, String sendBatchId) {
         AppDbConnection connection = DbConnectionContext.getConnection();
         SqlPStatement statement = connection.prepareStatement(selectUnsentSql);
         int paramPosition = 1;
@@ -279,8 +279,12 @@ public class MailRequestTable implements Initializable {
         if (StringUtil.hasValue(mailSendPatternId)) {
             statement.setString(paramPosition++, mailSendPatternId);
         }
-        if (StringUtil.hasValue(sendBatchInstanceIdColumnName) && StringUtil.hasValue(sendBatchInstanceId)) {
-            statement.setString(paramPosition++, sendBatchInstanceId);
+        if (StringUtil.hasValue(sendBatchIdColumnName)) {
+            if (StringUtil.hasValue(sendBatchId)) {
+                statement.setString(paramPosition++, sendBatchId);
+            } else {
+                throw new IllegalArgumentException("sendBatchId must not be null if you use in multi process.");
+            }
         }
         return statement;
     }
@@ -320,14 +324,21 @@ public class MailRequestTable implements Initializable {
         statement.executeUpdate();
     }
 
-    public void updateSendBatchInstanceId(final String sendBatchInstanceId) {
-        if (StringUtil.hasValue(sendBatchInstanceIdColumnName)) {
+    /**
+     * メール送信バッチIDを更新する。
+     * マルチプロセス用の設定がされている場合のみ更新し、
+     * 別トランザクションで実行する。
+     *
+     * @param sendBatchId 更新するメール送信バッチID
+     */
+    public void updateSendBatchId(final String sendBatchId) {
+        if (StringUtil.hasValue(sendBatchIdColumnName)) {
             SimpleDbTransactionManager manager = SystemRepository.get("mailMultiProcessTransaction");
             new SimpleDbTransactionExecutor<Void>(manager) {
                 @Override
                 public Void execute(AppDbConnection appDbConnection) {
-                    SqlPStatement statement = appDbConnection.prepareStatement(updateSendBatchInstanceIdSql);
-                    statement.setString(1, sendBatchInstanceId);
+                    SqlPStatement statement = appDbConnection.prepareStatement(updateSendBatchIdSql);
+                    statement.setString(1, sendBatchId);
                     statement.setString(2, mailConfig.getStatusUnsent());
                     statement.executeUpdate();
                     return null;
@@ -352,7 +363,7 @@ public class MailRequestTable implements Initializable {
         selectUnsentSql = createSelectUnsentSql();
         updateStatusSql = createUpdateStatus();
         updateFailureStatusSql = createUpdateFailureStatusSql();
-        updateSendBatchInstanceIdSql = createUpdateSendBatchInstanceIdSql();
+        updateSendBatchIdSql = createUpdateSendBatchIdSql();
     }
 
     /**
@@ -375,8 +386,8 @@ public class MailRequestTable implements Initializable {
         if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
             sql += "AND " + mailSendPatternIdColumnName + " = ? ";
         }
-        if (StringUtil.hasValue(sendBatchInstanceIdColumnName)) {
-            sql += "AND " + sendBatchInstanceIdColumnName + " = ? ";
+        if (StringUtil.hasValue(sendBatchIdColumnName)) {
+            sql += "AND " + sendBatchIdColumnName + " = ? ";
         }
         sql += "ORDER BY " + mailRequestIdColumnName;
         return sql;
@@ -396,8 +407,8 @@ public class MailRequestTable implements Initializable {
         if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
             sql += "AND " + mailSendPatternIdColumnName + " = ? ";
         }
-        if (StringUtil.hasValue(sendBatchInstanceIdColumnName)) {
-            sql += "AND " + sendBatchInstanceIdColumnName + " IS NULL ";
+        if (StringUtil.hasValue(sendBatchIdColumnName)) {
+            sql += "AND " + sendBatchIdColumnName + " IS NULL ";
         }
         return sql;
     }
@@ -461,11 +472,11 @@ public class MailRequestTable implements Initializable {
      *
      * @return 未処理データのメール送信バッチIDを更新するSQL
      */
-    private String createUpdateSendBatchInstanceIdSql() {
+    private String createUpdateSendBatchIdSql() {
         String update = "UPDATE " + tableName
-                + " SET " + sendBatchInstanceIdColumnName + " = ?"
+                + " SET " + sendBatchIdColumnName + " = ?"
                 + " WHERE " + statusColumnName + " = ? "
-                + " AND " + sendBatchInstanceIdColumnName + " IS NULL ";
+                + " AND " + sendBatchIdColumnName + " IS NULL ";
         return update;
     }
 

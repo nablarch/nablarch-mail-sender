@@ -3,122 +3,44 @@
     xmlns="http://tis.co.jp/nablarch/component-configuration" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://tis.co.jp/nablarch/component-configuration">
 
-    <config-file file="nablarch/common/mail/mail-batch.config" />
-    <config-file file="nablarch/common/mail/mail-session.config" />
-    
-    <import file="db-default.xml" />
+    <!-- メール送信ようの基本設定 -->
+    <import file="nablarch/common/mail/MailSenderTest.xml" />
 
-    <!-- メール関連テーブルスキーマ情報の定義ファイル -->
-    <import file="nablarch/common/mail/MailTableSchema.xml" />
-    <!-- 出力ライブラリ（メール送信）テストの共通定義ファイル -->
-    <import file="nablarch/common/mail/MailTestCommon.xml" />
-    <!-- マルチプロセス用のメール関連の設定 -->
-    <import file="nablarch/common/mail/MultiProcessOverride.xml" />
-    <!-- スレッドコンテキストに保持される共通属性を管理するハンドラ -->
-    <import file="nablarch/common/mail/handler/threadcontext.xml" />
-    <!-- ２重起動防止ハンドラ -->
-    <import file="nablarch/common/mail/handler/duplicateProcessCheck.xml" />
-    <!-- 常駐化ハンドラ -->
-    <import file="nablarch/common/mail/handler/processResident.xml" />
-    <!-- 処理停止ハンドラ -->
-    <import file="nablarch/common/mail/handler/residentProcessStop.xml" />
-    <!-- データベース接続ハンドラ -->
-    <import file="nablarch/common/mail/handler/db.xml" />
-
-    <import file="nablarch/common/mail/message.xml" />
-    
-    <!-- リクエストID抽出の実装 -->
-    <component name="requestIdExtractor" class="nablarch.common.util.ShortRequestIdExtractor" />
-
-    <!--コミットログ実装 -->
-    <component name="commitLogger" class="nablarch.core.log.app.BasicCommitLogger">
-        <property name="interval" value="500" />
+    <!-- マルチプロセス用の変更点 -->
+    <!-- メール送信要求管理テーブルのスキーマ情報 -->
+    <component name="mailRequestTable"
+               class="nablarch.common.mail.MailRequestTable">
+        <!--メール送信要求管理テーブルの名前 -->
+        <property name="tableName" value="MAIL_REQUEST_MULTI_PROCESS" />
+        <!-- メール送信要求管理テーブルの要求IDカラムの名前 -->
+        <property name="mailRequestIdColumnName" value="MAIL_REQUEST_ID" />
+        <!-- メール送信要求管理テーブルの件名カラムの名前 -->
+        <property name="subjectColumnName" value="SUBJECT" />
+        <!--メール送信要求管理テーブルの送信者メールアドレスカラムの名前 -->
+        <property name="fromColumnName" value="MAIL_FROM" />
+        <!--メール送信要求管理テーブルの返信先メールアドレスカラムの名前 -->
+        <property name="replyToColumnName" value="REPLY_TO" />
+        <!-- メール送信要求管理テーブルの差し戻し先メールアドレスカラムの名前 -->
+        <property name="returnPathColumnName" value="RETURN_PATH" />
+        <!-- メール送信要求管理テーブルの文字セットカラムの名前 -->
+        <property name="charsetColumnName" value="CHARSET" />
+        <!-- メール送信要求管理テーブルのステータスカラムの名前 -->
+        <property name="statusColumnName" value="STATUS" />
+        <!--メール送信要求管理テーブルの要求日時カラムの名前 -->
+        <property name="requestDateTimeColumnName" value="REQUEST_DATETIME" />
+        <!-- メール送信要求管理テーブルのメール送信日時カラムの名前 -->
+        <property name="sendDateTimeColumnName" value="SEND_DATETIME" />
+        <!--メール送信要求管理テーブルの本文カラムの名前 -->
+        <property name="mailBodyColumnName" value="MAIL_BODY" />
+        <!-- メール送信要求管理テーブルのメール送信バッチIDのカラムの名前 -->
+        <property name="sendBatchIdColumnName" value="BATCH_ID" />
     </component>
 
-    <!-- ハンドラキュー構成 -->
-    <list name="handlerQueue">
-        <!-- ステータスコードを終了コードに変換するハンドラ -->
-        <component class="nablarch.fw.handler.StatusCodeConvertHandler" />
-        <!-- グローバルエラーハンドラ -->
-        <component class="nablarch.fw.handler.GlobalErrorHandler" />
-        <!-- エラー検証用の専用ハンドラ -->
-        <component
-            class="nablarch.common.mail.MailSenderTest$MailTestErrorHandler" />
-        <!-- スレッドコンテキスト設定ハンドラ -->
-        <component-ref name="threadContextHandler" />
-        <!-- ２重起動防止ハンドラ -->
-        <component-ref name="duplicateProcessCheckHandler" />
-        <!-- 常駐化ハンドラ （テスト時は戻ってこさせるためにはずす） -->
-        <!--<component-ref name="processResidentHandler" /> -->
-        <!--処理停止ハンドラ -->
-        <component-ref name="processStopHandler" />
-        <!-- データベース接続ハンドラ -->
-        <component-ref name="dbConnectionManagementHandler" />
-        <!--トランザクションマネージャ -->
-        <component-ref name="transactionManagementHandler" />
-        <!-- ディスパッチ -->
-        <component class="nablarch.fw.handler.RequestPathJavaPackageMapping">
-            <property name="basePackage" value="." />
-            <property name="immediate" value="false" />
-        </component>
-        <!-- スレッド実行ハンドラ -->
-        <component class="nablarch.fw.handler.MultiThreadExecutionHandler">
-            <property name="concurrentNumber" value="${threadCount}" />
-            <property name="commitLogger" ref="commitLogger" />
-        </component>
-
-        <!-- データベース接続ハンドラ -->
-        <component-ref name="dbConnectionManagementHandler" />
-
-        <!-- ループ・トランザクション制御ハンドラ -->
-        <component class="nablarch.fw.handler.LoopHandler">
-            <property name="commitInterval" value="${commitInterval}" />
-            <property name="transactionFactory" ref="jdbcTransactionFactory" />
-        </component>
-
-        <!-- データリードハンドラ -->
-        <component class="nablarch.fw.handler.DataReadHandler">
-            <property name="maxCount" value="${maxCount}" />
-        </component>
-    </list>
-
-    <component name="mailSessionConfig" class="nablarch.common.mail.MailSessionConfig">
-        <property name="mailSmtpHost" value="${mail.smtp.host}" />
-        <property name="mailHost" value="${mail.host}" />
-        <property name="mailSmtpPort" value="${mail.smtp.port}" />
-        <property name="mailSmtpConnectionTimeout" value="${mail.smtp.connectiontimeout}" />
-        <property name="mailSmtpTimeout" value="${mail.smtp.timeout}" />
-        <property name="option">
-            <map>
-                <entry key="mail.debug" value="true" />
-            </map>
-        </property>
-    </component>
-
-    <component name="initializer"
-        class="nablarch.core.repository.initialization.BasicApplicationInitializer">
-        <property name="initializeList">
-            <list>
-                <component-ref name="duplicateProcessChecker" />
-                <component-ref name="processStopHandler" />
-                <component-ref name="mailRequestTable" />
-                <component-ref name="mailRecipientTable" />
-                <component-ref name="mailAttachedFileTable" />
-                <component-ref name="stringResourceCache" />
-            </list>
-        </property>
-    </component>
-
-    <component name="systemTimeProvider"
-        class="nablarch.core.date.BasicSystemTimeProvider" />
-
-    <!-- オブジェクトの情報のキャッシュ設定 -->
-    <component name="statementValueObjectCache" class="nablarch.core.cache.BasicStaticDataCache">
-        <property name="loader">
-            <component
-                class="nablarch.core.db.statement.autoproperty.FieldAndAnnotationLoader" />
-        </property>
-        <property name="loadOnStartup" value="false" />
+    <!-- 処理するバッチID更新用のトランザクション -->
+    <component name="mailMultiProcessTransaction" class="nablarch.core.db.transaction.SimpleDbTransactionManager">
+        <property name="connectionFactory" ref="connectionFactory" />
+        <property name="transactionFactory" ref="jdbcTransactionFactory" />
+        <property name="dbTransactionName" value="mailMultiProcessTransaction" />
     </component>
 
 </component-configuration>

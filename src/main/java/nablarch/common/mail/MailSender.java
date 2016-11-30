@@ -36,7 +36,7 @@ import nablarch.fw.reader.DatabaseRecordReader;
 public class MailSender extends BatchAction<SqlRow> {
 
     /** メール送信バッチを識別するID */
-    final private String batchInstanceId  = UUID.randomUUID().toString();
+    private final String batchId = UUID.randomUUID().toString();
 
     /**
      * コンストラクタ。
@@ -269,13 +269,13 @@ public class MailSender extends BatchAction<SqlRow> {
         writeLog(mailConfig.getMailRequestCountMessageId(), unsentRecordCount);
 
         DatabaseRecordReader reader = new DatabaseRecordReader();
-        reader.setStatement(mailRequestTable.createReaderStatement(mailSendPatternId, batchInstanceId));
+        reader.setStatement(mailRequestTable.createReaderStatement(mailSendPatternId, batchId));
 
         reader.setListener(new DatabaseRecordListener() {
             @Override
             public void beforeReadRecords() {
                 final MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
-                mailRequestTable.updateSendBatchInstanceId(batchInstanceId);
+                mailRequestTable.updateSendBatchId(batchId);
             }
         });
         return reader;
