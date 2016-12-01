@@ -6,6 +6,9 @@ import nablarch.core.db.connection.DbConnectionContext;
 import nablarch.core.db.statement.SqlPStatement;
 import nablarch.core.db.statement.SqlResultSet;
 import nablarch.core.db.statement.SqlRow;
+import nablarch.core.db.transaction.SimpleDbTransactionExecutor;
+import nablarch.core.db.transaction.SimpleDbTransactionManager;
+import nablarch.core.repository.SystemRepository;
 import nablarch.core.repository.initialization.Initializable;
 import nablarch.core.util.StringUtil;
 import nablarch.core.util.annotation.Published;
@@ -54,6 +57,9 @@ public class MailRequestTable implements Initializable {
     /** メール送信パターンIDカラム名 */
     private String mailSendPatternIdColumnName;
 
+    /** メール送信バッチのプロセスIDのカラム名 */
+    private String sendProcessIdColumnName;
+
     /** メール送信要求を登録するSQL */
     private String insertSql;
 
@@ -68,6 +74,9 @@ public class MailRequestTable implements Initializable {
 
     /** メール送信失敗時のステータスを更新するSQL */
     private String updateFailureStatusSql;
+
+    /** メール送信バッチのプロセスIDを更新するSQL */
+    private String updateSendProcessIdSql;
 
     /** メール関連のコード値を保持するデータオブジェクト */
     private MailConfig mailConfig;
@@ -181,6 +190,15 @@ public class MailRequestTable implements Initializable {
     }
 
     /**
+     * 送信するバッチのプロセスIDのカラム名を設定する。
+     *
+     * @param sendProcessIdColumnName 送信するバッチのプロセスIDのカラム名
+     */
+    public void setSendProcessIdColumnName(String sendProcessIdColumnName) {
+        this.sendProcessIdColumnName = sendProcessIdColumnName;
+    }
+
+    /**
      * メール関連のコード値を保持するデータオブジェクトを設定する。
      *
      * @param mailConfig メール関連のコード値を保持するデータオブジェクト
@@ -237,17 +255,36 @@ public class MailRequestTable implements Initializable {
     }
 
     /**
-     * 処理対象データをし取得する{@link SqlPStatement}を生成する。
+     * 処理対象データを取得する{@link SqlPStatement}を生成する。
      *
      * @param mailSendPatternId メール送信パターンID
      * @return 処理対象データを取得するステートメント
      */
     public SqlPStatement createReaderStatement(String mailSendPatternId) {
+        return createReaderStatement(mailSendPatternId, null);
+    }
+
+    /**
+     * 処理対象データを取得する{@link SqlPStatement}を生成する。
+     *
+     * @param mailSendPatternId メール送信パターンID
+     * @param sendProcessId メール送信バッチのプロセスID
+     * @return 処理対象データを取得するステートメント
+     */
+    public SqlPStatement createReaderStatement(String mailSendPatternId, String sendProcessId) {
         AppDbConnection connection = DbConnectionContext.getConnection();
         SqlPStatement statement = connection.prepareStatement(selectUnsentSql);
-        statement.setString(1, mailConfig.getStatusUnsent());
+        int paramPosition = 1;
+        statement.setString(paramPosition++, mailConfig.getStatusUnsent());
         if (StringUtil.hasValue(mailSendPatternId)) {
-            statement.setString(2, mailSendPatternId);
+            statement.setString(paramPosition++, mailSendPatternId);
+        }
+        if (StringUtil.hasValue(sendProcessIdColumnName)) {
+            if (StringUtil.hasValue(sendProcessId)) {
+                statement.setString(paramPosition++, sendProcessId);
+            } else {
+                throw new IllegalArgumentException("sendProcessId must not be null if you use in multi process.");
+            }
         }
         return statement;
     }
@@ -288,6 +325,29 @@ public class MailRequestTable implements Initializable {
     }
 
     /**
+     * メール送信バッチのプロセスIDを更新する。<p/>
+     * マルチプロセス用の設定がされている場合のみ更新し、
+     * 別トランザクションで実行する。
+     *
+     * @param sendProcessId 更新するメール送信バッチのプロセスID
+     */
+    public void updateSendProcessId(final String sendProcessId) {
+        if (StringUtil.hasValue(sendProcessIdColumnName)) {
+            SimpleDbTransactionManager manager = SystemRepository.get("mailMultiProcessTransaction");
+            new SimpleDbTransactionExecutor<Void>(manager) {
+                @Override
+                public Void execute(AppDbConnection appDbConnection) {
+                    SqlPStatement statement = appDbConnection.prepareStatement(updateSendProcessIdSql);
+                    statement.setString(1, sendProcessId);
+                    statement.setString(2, mailConfig.getStatusUnsent());
+                    statement.executeUpdate();
+                    return null;
+                }
+            }.doTransaction();
+        }
+    }
+
+    /**
      * SQLの取得結果の1レコードをMailRequestTable.MailRequestに変換する。
      * @param data メール送信要求1レコード
      * @return メール送信要求
@@ -303,6 +363,7 @@ public class MailRequestTable implements Initializable {
         selectUnsentSql = createSelectUnsentSql();
         updateStatusSql = createUpdateStatus();
         updateFailureStatusSql = createUpdateFailureStatusSql();
+        updateSendProcessIdSql = createUpdateSendProcessIdSql();
     }
 
     /**
@@ -325,6 +386,9 @@ public class MailRequestTable implements Initializable {
         if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
             sql += "AND " + mailSendPatternIdColumnName + " = ? ";
         }
+        if (StringUtil.hasValue(sendProcessIdColumnName)) {
+            sql += "AND " + sendProcessIdColumnName + " = ? ";
+        }
         sql += "ORDER BY " + mailRequestIdColumnName;
         return sql;
     }
@@ -341,7 +405,10 @@ public class MailRequestTable implements Initializable {
                 + " WHERE "
                 + statusColumnName + " = ? ";
         if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
-            sql += "AND " + mailSendPatternIdColumnName + " = ?";
+            sql += "AND " + mailSendPatternIdColumnName + " = ? ";
+        }
+        if (StringUtil.hasValue(sendProcessIdColumnName)) {
+            sql += "AND " + sendProcessIdColumnName + " IS NULL ";
         }
         return sql;
     }
@@ -398,6 +465,19 @@ public class MailRequestTable implements Initializable {
             values += ",?";
         }
         return insert + ") values (" + values + ')';
+    }
+
+    /**
+     * 未処理データのメール送信バッチのプロセスIDを更新するSQLを生成する。
+     *
+     * @return 未処理データのメール送信バッチのプロセスIDを更新するSQL
+     */
+    private String createUpdateSendProcessIdSql() {
+        String update = "UPDATE " + tableName
+                + " SET " + sendProcessIdColumnName + " = ?"
+                + " WHERE " + statusColumnName + " = ? "
+                + " AND " + sendProcessIdColumnName + " IS NULL ";
+        return update;
     }
 
     /**

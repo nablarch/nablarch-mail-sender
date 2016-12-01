@@ -3,6 +3,7 @@ package nablarch.common.mail;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 
 import javax.activation.DataHandler;
 import javax.activation.DataSource;
@@ -22,6 +23,7 @@ import nablarch.core.util.annotation.Published;
 import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
 import nablarch.fw.Result;
+import nablarch.fw.reader.DatabaseRecordListener;
 import nablarch.fw.results.TransactionAbnormalEnd;
 import nablarch.fw.action.BatchAction;
 import nablarch.fw.reader.DatabaseRecordReader;
@@ -32,6 +34,9 @@ import nablarch.fw.reader.DatabaseRecordReader;
  * @author Shinsuke Yoshio
  */
 public class MailSender extends BatchAction<SqlRow> {
+
+    /** メール送信バッチを識別するプロセスID */
+    private final String processId = UUID.randomUUID().toString();
 
     /**
      * コンストラクタ。
@@ -264,8 +269,15 @@ public class MailSender extends BatchAction<SqlRow> {
         writeLog(mailConfig.getMailRequestCountMessageId(), unsentRecordCount);
 
         DatabaseRecordReader reader = new DatabaseRecordReader();
-        reader.setStatement(mailRequestTable.createReaderStatement(mailSendPatternId));
+        reader.setStatement(mailRequestTable.createReaderStatement(mailSendPatternId, processId));
 
+        reader.setListener(new DatabaseRecordListener() {
+            @Override
+            public void beforeReadRecords() {
+                final MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
+                mailRequestTable.updateSendProcessId(processId);
+            }
+        });
         return reader;
     }
 

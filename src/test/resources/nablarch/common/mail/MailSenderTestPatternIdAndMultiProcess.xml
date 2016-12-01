@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component-configuration
+    xmlns="http://tis.co.jp/nablarch/component-configuration" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://tis.co.jp/nablarch/component-configuration">
+
+    <!-- メール送信ようの基本設定 -->
+    <import file="nablarch/common/mail/MailSenderTest.xml" />
+
+    <!-- マルチプロセス用の変更点 -->
+    <!-- メール送信要求管理テーブルのスキーマ情報 -->
+    <component name="mailRequestTable"
+               class="nablarch.common.mail.MailRequestTable">
+        <!--メール送信要求管理テーブルの名前 -->
+        <property name="tableName" value="MAIL_REQUEST_PAT_M_PROCESS" />
+        <!-- メール送信要求管理テーブルの要求IDカラムの名前 -->
+        <property name="mailRequestIdColumnName" value="MAIL_REQUEST_ID" />
+        <!-- メール送信要求管理テーブルの件名カラムの名前 -->
+        <property name="subjectColumnName" value="SUBJECT" />
+        <!--メール送信要求管理テーブルの送信者メールアドレスカラムの名前 -->
+        <property name="fromColumnName" value="MAIL_FROM" />
+        <!--メール送信要求管理テーブルの返信先メールアドレスカラムの名前 -->
+        <property name="replyToColumnName" value="REPLY_TO" />
+        <!-- メール送信要求管理テーブルの差し戻し先メールアドレスカラムの名前 -->
+        <property name="returnPathColumnName" value="RETURN_PATH" />
+        <!-- メール送信要求管理テーブルの文字セットカラムの名前 -->
+        <property name="charsetColumnName" value="CHARSET" />
+        <!-- メール送信要求管理テーブルのステータスカラムの名前 -->
+        <property name="statusColumnName" value="STATUS" />
+        <!--メール送信要求管理テーブルの要求日時カラムの名前 -->
+        <property name="requestDateTimeColumnName" value="REQUEST_DATETIME" />
+        <!-- メール送信要求管理テーブルのメール送信日時カラムの名前 -->
+        <property name="sendDateTimeColumnName" value="SEND_DATETIME" />
+        <!--メール送信要求管理テーブルの本文カラムの名前 -->
+        <property name="mailBodyColumnName" value="MAIL_BODY" />
+        <!-- メール送信要求管理テーブルのパターンIDカラムの名前 -->
+        <property name="mailSendPatternIdColumnName"  value="MAIL_SEND_PATTERN_ID" />
+        <!-- メール送信要求管理テーブルのメール送信バッチのプロセスIDのカラムの名前 -->
+        <property name="sendProcessIdColumnName" value="PROCESS_ID" />
+    </component>
+
+    <!-- 処理するバッチのプロセスID更新用のトランザクション -->
+    <component name="mailMultiProcessTransaction" class="nablarch.core.db.transaction.SimpleDbTransactionManager">
+        <property name="connectionFactory" ref="connectionFactory" />
+        <property name="transactionFactory" ref="jdbcTransactionFactory" />
+        <property name="dbTransactionName" value="mailMultiProcessTransaction" />
+    </component>
+
+</component-configuration>
