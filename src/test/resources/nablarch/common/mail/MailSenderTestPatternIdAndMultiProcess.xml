@@ -35,7 +35,7 @@
         <!-- メール送信要求管理テーブルのパターンIDカラムの名前 -->
         <property name="mailSendPatternIdColumnName"  value="MAIL_SEND_PATTERN_ID" />
         <!-- メール送信要求管理テーブルのメール送信バッチのプロセスIDのカラムの名前 -->
-        <property name="sendProcessIdColumnName" value="BATCH_ID" />
+        <property name="sendProcessIdColumnName" value="PROCESS_ID" />
     </component>
 
     <!-- 処理するバッチのプロセスID更新用のトランザクション -->

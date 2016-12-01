@@ -18,7 +18,7 @@ public class MailRequestMultiProcess {
 
     public MailRequestMultiProcess(String mailRequestId, String subject, String mailFrom, String replyTo,
                                    String returnPath, String charset, String status, Timestamp requestDatetime,
-                                   Timestamp sendDatetime, String mailBody, String batchId) {
+                                   Timestamp sendDatetime, String mailBody, String processId) {
         super();
         this.mailRequestId = mailRequestId;
         this.subject = subject;
@@ -30,7 +30,7 @@ public class MailRequestMultiProcess {
         this.requestDatetime = requestDatetime;
         this.sendDatetime = sendDatetime;
         this.mailBody = mailBody;
-        this.batchId = batchId;
+        this.processId = processId;
     }
 
     @Id
@@ -64,6 +64,6 @@ public class MailRequestMultiProcess {
     @Column(name = "MAIL_BODY", length = 4000, nullable = false)
     public String mailBody;
 
-    @Column(name = "BATCH_ID", length = 36)
-    public String batchId;
+    @Column(name = "PROCESS_ID", length = 36)
+    public String processId;
 }

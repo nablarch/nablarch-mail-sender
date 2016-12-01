@@ -76,7 +76,6 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         // データ準備
         String mailRequestId = "1";
         String subject = "正常系1";
-        String otherBatchId = UUID.randomUUID().toString();
 
         VariousDbTestHelper.setUpTable(
                 new MailRequestMultiProcess(mailRequestId, subject, from, replyTo, returnPath, charset,
@@ -151,7 +150,7 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         assertThat("レコード取得数", mailRequestList.size(), is(1));
         assertThat("ステータスが更新されているはず", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
         assertThat("送信日時が登録されているはず", mailRequestList.get(0).sendDatetime, notNullValue());
-        assertThat("プロセスIDが登録されているはず", mailRequestList.get(0).batchId, notNullValue());
+        assertThat("プロセスIDが登録されているはず", mailRequestList.get(0).processId, notNullValue());
     }
 
     /**
@@ -168,7 +167,6 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         // データ準備
         String mailRequestId = "1";
         String subject = "正常系1";
-        String otherBatchId = UUID.randomUUID().toString();
 
         VariousDbTestHelper.setUpTable(
                 new MailRequestMultiProcess(mailRequestId, subject, from, replyTo, returnPath, charset,
@@ -192,7 +190,7 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         assertThat("レコード取得数", mailRequestList.size(), is(1));
         assertThat("ステータスが更新されてないはず", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
         assertThat("送信日時が登録されてないはず", mailRequestList.get(0).sendDatetime, nullValue());
-        assertThat("プロセスIDが登録されていないはず", mailRequestList.get(0).batchId, nullValue());
+        assertThat("プロセスIDが登録されていないはず", mailRequestList.get(0).processId, nullValue());
     }
 
     /**
@@ -209,11 +207,11 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         // データ準備
         String mailRequestId = "1";
         String subject = "正常系1";
-        String otherBatchId = UUID.randomUUID().toString();
+        String otherProcessId = UUID.randomUUID().toString();
 
         VariousDbTestHelper.setUpTable(
                 new MailRequestMultiProcess(mailRequestId, subject, from, replyTo, returnPath, charset,
-                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, otherBatchId));
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, otherProcessId));
 
         VariousDbTestHelper.setUpTable(
                 new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeCC(), cc1));
@@ -233,7 +231,7 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         assertThat("レコード取得数", mailRequestList.size(), is(1));
         assertThat("ステータスが更新されないはず", mailRequestList.get(0).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されないはず", mailRequestList.get(0).sendDatetime, nullValue());
-        assertThat("プロセスIDが登録されているはず", mailRequestList.get(0).batchId, is(otherBatchId));
+        assertThat("プロセスIDが登録されているはず", mailRequestList.get(0).processId, is(otherProcessId));
     }
 
     /**
