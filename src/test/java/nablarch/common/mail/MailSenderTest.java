@@ -23,20 +23,23 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage.RecipientType;
 
 import nablarch.core.date.SystemTimeUtil;
+import nablarch.core.db.DbAccessException;
 import nablarch.core.util.FileUtil;
-import nablarch.fw.ExecutionContext;
-import nablarch.fw.Handler;
 import nablarch.fw.launcher.CommandLine;
 import nablarch.fw.launcher.Main;
 import nablarch.test.support.SystemRepositoryResource;
 import nablarch.test.support.db.helper.DatabaseTestRunner;
 import nablarch.test.support.db.helper.TargetDb;
 import nablarch.test.support.db.helper.VariousDbTestHelper;
+import nablarch.test.support.log.app.OnMemoryLogWriter;
 
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import mockit.Mock;
+import mockit.MockUp;
 
 /**
  * {@link MailSender}のテストクラス。
@@ -437,10 +440,10 @@ public class MailSenderTest extends MailTestSupport {
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTestOverrideSmtpPort.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
-        int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        int rc = Main.execute(commandLine);
+        assertThat("送信失敗しても処理自体は正常終了する", rc, is(0));
 
-        assertError(MailTestErrorHandler.catched, mailRequestId, mailConfig.getAbnormalEndExitCode());
+        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[4]");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
@@ -477,9 +480,9 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTestOverrideSmtpConnetcionTimeout.xml",
                 "-requestPath", "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        assertThat("送信に失敗しても処理は成功なので0", execute, is(0));
 
-        assertError(MailTestErrorHandler.catched, mailRequestId, mailConfig.getAbnormalEndExitCode());
+        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[5]");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
@@ -514,10 +517,10 @@ public class MailSenderTest extends MailTestSupport {
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
-        int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        int rc = Main.execute(commandLine);
+        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
 
-        assertError(MailTestErrorHandler.catched, mailRequestId, mailConfig.getAbnormalEndExitCode());
+        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[6]");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
@@ -553,10 +556,10 @@ public class MailSenderTest extends MailTestSupport {
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTestOverrideSmtpTimeout.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
-        int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        int rc = Main.execute(commandLine);
+        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
 
-        assertError(MailTestErrorHandler.catched, mailRequestId, mailConfig.getAbnormalEndExitCode());
+        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[7]");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
@@ -680,26 +683,12 @@ public class MailSenderTest extends MailTestSupport {
                 new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1),
                 new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeTO(), "hoge\n" + bcc1));
 
-        //LogVerifier.setExpectedLogMessages(new ArrayList<Map<String,String>>() {
-        //    {
-        //        add(new HashMap<String, String>() {
-        //            {
-        //                put("logLevel", "FATAL");
-        //                put("message1", "Local address contains control or whitespace");
-        //            }
-        //        });
-        //    }
-        //});
-
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
         assertThat("異常終了なので戻り値は20となる。", execute, is(20));
-
-        // ----- assert log -----
-        //LogVerifier.verify("assert log");
     }
 
     /**
@@ -716,7 +705,7 @@ public class MailSenderTest extends MailTestSupport {
 
         // データ準備
         String mailRequestId = "1";
-        String subject = "正常系";
+        String subject = "送信者メールアドレスが不正";
 
         VariousDbTestHelper.setUpTable(
                 new MailRequest(mailRequestId, subject, from + "\rhoge", replyTo, returnPath, charset,
@@ -725,26 +714,15 @@ public class MailSenderTest extends MailTestSupport {
         VariousDbTestHelper.setUpTable(
                 new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
 
-        //LogVerifier.setExpectedLogMessages(new ArrayList<Map<String,String>>() {
-        //    {
-        //        add(new HashMap<String, String>() {
-        //            {
-        //                put("logLevel", "FATAL");
-        //                put("message1", "Domain contains control or whitespace");
-        //            }
-        //        });
-        //    }
-        //});
-
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        assertThat("送信に失敗しても処理は成功なので0", execute, is(0));
 
         // ----- assert log -----
-        //LogVerifier.verify("assert log");
+        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[1]");
     }
 
     /**
@@ -761,7 +739,7 @@ public class MailSenderTest extends MailTestSupport {
 
         // データ準備
         String mailRequestId = "1";
-        String subject = "正常系";
+        String subject = "返信先メールアドレスが不正";
 
         VariousDbTestHelper.setUpTable(
                 new MailRequest(mailRequestId, subject, from, "hoge\n" + replyTo, returnPath, charset,
@@ -770,26 +748,15 @@ public class MailSenderTest extends MailTestSupport {
         VariousDbTestHelper.setUpTable(
                 new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
 
-        //LogVerifier.setExpectedLogMessages(new ArrayList<Map<String,String>>() {
-        //    {
-        //        add(new HashMap<String, String>() {
-        //            {
-        //                put("logLevel", "FATAL");
-        //                put("message1", "Local address contains control or whitespace");
-        //            }
-        //        });
-        //    }
-        //});
-
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
-        int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        int rc = Main.execute(commandLine);
+        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
 
-        // ----- assert log -----
-        //LogVerifier.verify("assert log");
+        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[1]");
+
     }
 
     /**
@@ -806,7 +773,7 @@ public class MailSenderTest extends MailTestSupport {
 
         // データ準備
         String mailRequestId = "1";
-        String subject = "正常系";
+        String subject = "文字セットが不正";
 
         VariousDbTestHelper.setUpTable(
                 new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset + "\nhoge",
@@ -815,26 +782,15 @@ public class MailSenderTest extends MailTestSupport {
         VariousDbTestHelper.setUpTable(
                 new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
 
-        //LogVerifier.setExpectedLogMessages(new ArrayList<Map<String,String>>() {
-        //    {
-        //        add(new HashMap<String, String>() {
-        //            {
-        //                put("logLevel", "FATAL");
-        //                put("message1", "Encoding error");
-        //            }
-        //        });
-        //    }
-        //});
-
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
-        int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
 
-        // ----- assert log -----
-        //LogVerifier.verify("assert log");
+        int rc = Main.execute(commandLine);
+        assertThat("処理自体は正常終了となる", rc, is(0));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[1]");
     }
 
     /**
@@ -880,65 +836,37 @@ public class MailSenderTest extends MailTestSupport {
         VariousDbTestHelper.insert(
                 new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
 
-        //LogVerifier.setExpectedLogMessages(new ArrayList<Map<String,String>>() {
-        //    {
-        //        add(new HashMap<String, String>() {
-        //            {
-        //                put("logLevel", "FATAL");
-        //                put("message1", "contains invalid character");
-        //            }
-        //        });
-        //    }
-        //});
-
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
-        int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        int rc = Main.execute(commandLine);
+        assertThat("メール送信失敗なので処理自体は成功", rc, is(0));
 
-        // ----- assert log -----
-        //LogVerifier.verify("assert log");
-
-        // 異常系送信結果
-        assertError(MailTestErrorHandler.catched, "2", mailConfig.getAbnormalEndExitCode());
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "-INFO- メールを送信しました。 mailRequestId=[1]",
+                "-ERROR- メール送信に失敗しました。 mailRequestId=[2]",
+                "-INFO- メールを送信しました。 mailRequestId=[3]");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class, "mailRequestId");
         assertThat("レコード取得数", mailRequestList.size(), is(3));
+
+        // id:1(success)
         assertThat("メールリクエストIDが1", mailRequestList.get(0).mailRequestId, is("1"));
         assertThat("ステータスが「送信成功」になっているはず", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
         assertThat("送信日時が登録されているはず", mailRequestList.get(0).sendDatetime, is(notNullValue()));
+
+        // id:2(fail)
         assertThat("メールリクエストIDが2", mailRequestList.get(1).mailRequestId, is("2"));
         assertThat("ステータスが「送信失敗」になっているはず", mailRequestList.get(1).status, is(mailConfig.getStatusFailure()));
         assertThat("送信日時が登録されていないはず", mailRequestList.get(1).sendDatetime, is(nullValue()));
-        assertThat("メールリクエストIDが3", mailRequestList.get(2).mailRequestId, is("3"));
-        assertThat("ステータスが「未送信」のままのはず", mailRequestList.get(2).status, is(mailConfig.getStatusUnsent()));
-        assertThat("送信日時が登録されていないはず", mailRequestList.get(2).sendDatetime, is(nullValue()));
 
-        // バッチ実行
-        commandLine = new CommandLine("-diConfig",
-                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
-                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
-        execute = Main.execute(commandLine);
-        assertThat("正常終了なので戻り値は0となる。", execute, is(0));
-
-        // 異常系送信結果
-        assertError(MailTestErrorHandler.catched, "2", mailConfig.getAbnormalEndExitCode());
-
-        // DBの検証（ステータスと送信日時）
-        mailRequestList = VariousDbTestHelper.findAll(MailRequest.class, "mailRequestId");
-        assertThat("レコード取得数", mailRequestList.size(), is(3));
-        assertThat("メールリクエストIDが1", mailRequestList.get(0).mailRequestId, is("1"));
-        assertThat("ステータスが「送信成功」になっているはず", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
-        assertThat("送信日時が登録されているはず", mailRequestList.get(0).sendDatetime, is(notNullValue()));
-        assertThat("メールリクエストIDが2", mailRequestList.get(1).mailRequestId, is("2"));
-        assertThat("ステータスが「送信失敗」になっているはず", mailRequestList.get(1).status, is(mailConfig.getStatusFailure()));
-        assertThat("送信日時が登録されていないはず", mailRequestList.get(1).sendDatetime, is(nullValue()));
+        // id:3(success)
         assertThat("メールリクエストIDが3", mailRequestList.get(2).mailRequestId, is("3"));
         assertThat("ステータスが「送信成功」になっているはず", mailRequestList.get(2).status, is(mailConfig.getStatusSent()));
         assertThat("送信日時が登録されているはず", mailRequestList.get(2).sendDatetime, is(notNullValue()));
+
     }
 
     /**
@@ -985,81 +913,136 @@ public class MailSenderTest extends MailTestSupport {
         VariousDbTestHelper.insert(
                 new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
 
-        //LogVerifier.setExpectedLogMessages(new ArrayList<Map<String,String>>() {
-        //    {
-        //        add(new HashMap<String, String>() {
-        //            {
-        //                put("logLevel", "FATAL");
-        //                put("message1", "contains invalid character");
-        //            }
-        //        });
-        //    }
-        //});
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+
+        // ----- assert log -----
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "-INFO- メールを送信しました。 mailRequestId=[1]",
+                "-ERROR- メール送信に失敗しました。 mailRequestId=[2]",
+                "-INFO- メールを送信しました。 mailRequestId=[3]");
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class, "mailRequestId");
+        assertThat("レコード取得数", mailRequestList.size(), is(3));
+
+        // id:1(success)
+        assertThat("メールリクエストIDが1", mailRequestList.get(0).mailRequestId, is("1"));
+        assertThat("ステータスが「送信成功」になっているはず", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
+        assertThat("送信日時が登録されているはず", mailRequestList.get(0).sendDatetime, is(notNullValue()));
+
+        // id:2(fail)
+        assertThat("メールリクエストIDが2", mailRequestList.get(1).mailRequestId, is("2"));
+        assertThat("ステータスが「送信失敗」になっているはず", mailRequestList.get(1).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時が登録されていないはず", mailRequestList.get(1).sendDatetime, is(nullValue()));
+
+        // id:3(success)
+        assertThat("メールリクエストIDが3", mailRequestList.get(2).mailRequestId, is("3"));
+        assertThat("ステータスが「送信成功」になっているはず", mailRequestList.get(2).status, is(mailConfig.getStatusSent()));
+        assertThat("送信日時が登録されているはず", mailRequestList.get(2).sendDatetime, is(notNullValue()));
+
+        // バッチ実行
+        OnMemoryLogWriter.clear();
+        commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        rc = Main.execute(commandLine);
+        assertThat("正常終了なので戻り値は0となる。", rc, is(0));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory", "-INFO- メール送信要求が 0 件あります。");
+
+    }
+
+
+    /**
+     * 処理が異常終了する場合のテスト<br/>
+     * <br/>
+     * メール送信失敗→ステータス更新に失敗する場合は処理が異常終了すること。
+     */
+    @Test
+    public void testSendFailAndStatusUpdateFail() throws Exception {
+
+        new MockUp<MailRequestTable>() {
+            @Mock
+            void updateFailureStatus(final String mailRequestId, final String status) {
+                throw new DbAccessException("db error!!!!", new SQLException());
+            }
+        };
+
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "正常系";
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
+
+        mailRequestId = "2";
+        subject = "異常系(returnPathに改行)";
+
+        VariousDbTestHelper.insert(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath + ">\nRCPT TO: <to2@localhost>",
+                        charset, mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.insert(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
+
+        mailRequestId = "3";
+        subject = "正常系";
+
+        VariousDbTestHelper.insert(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+
+        VariousDbTestHelper.insert(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
-        int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        int rc = Main.execute(commandLine);
+        assertThat("送信失敗ステータスへの更新失敗なので異常終了する", rc, is(20));
 
         // ----- assert log -----
-        //LogVerifier.verify("assert log");
-
-        // 異常系送信結果
-        assertError(MailTestErrorHandler.catched, "2", mailConfig.getAbnormalEndExitCode());
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "-INFO- メールを送信しました。 mailRequestId=[1]",
+                "-ERROR- メール送信に失敗しました。 mailRequestId=[2]",
+                "failed to update unsent status. need to apply a patch to change the status to unsent. target data=[mailRequestId = 2]");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class, "mailRequestId");
         assertThat("レコード取得数", mailRequestList.size(), is(3));
+
+        // id:1(success)
         assertThat("メールリクエストIDが1", mailRequestList.get(0).mailRequestId, is("1"));
         assertThat("ステータスが「送信成功」になっているはず", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
         assertThat("送信日時が登録されているはず", mailRequestList.get(0).sendDatetime, is(notNullValue()));
+
+        // id:2(fail)
         assertThat("メールリクエストIDが2", mailRequestList.get(1).mailRequestId, is("2"));
-        assertThat("ステータスが「送信失敗」になっているはず", mailRequestList.get(1).status, is(mailConfig.getStatusFailure()));
-        assertThat("送信日時が登録されていないはず", mailRequestList.get(1).sendDatetime, is(nullValue()));
+        assertThat("送信失敗への変更に失敗するので送信済みステータスのまま", mailRequestList.get(1).status, is(mailConfig.getStatusSent()));
+        assertThat("送信日時が登録されていないはず", mailRequestList.get(1).sendDatetime, is(notNullValue()));
+
+        // id:3(unsent)
         assertThat("メールリクエストIDが3", mailRequestList.get(2).mailRequestId, is("3"));
-        assertThat("ステータスが「未送信」のままのはず", mailRequestList.get(2).status, is(mailConfig.getStatusUnsent()));
-        assertThat("送信日時が登録されていないはず", mailRequestList.get(2).sendDatetime, is(nullValue()));
+        assertThat("ステータスが「送信成功」になっているはず", mailRequestList.get(2).status, is(mailConfig.getStatusUnsent()));
+        assertThat("送信日時は未更新(null)", mailRequestList.get(2).sendDatetime, is(nullValue()));
 
         // バッチ実行
+        OnMemoryLogWriter.clear();
         commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
-        execute = Main.execute(commandLine);
-        assertThat("正常終了なので戻り値は0となる。", execute, is(0));
+        rc = Main.execute(commandLine);
+        assertThat("正常終了なので戻り値は0となる。", rc, is(0));
 
-        // 異常系送信結果
-        assertError(MailTestErrorHandler.catched, "2", mailConfig.getAbnormalEndExitCode());
+        // 送信されなかった1件が対象となる
+        OnMemoryLogWriter.assertLogContains("writer.memory", "-INFO- メール送信要求が 1 件あります。");
 
-        // DBの検証（ステータスと送信日時）
-        mailRequestList = VariousDbTestHelper.findAll(MailRequest.class, "mailRequestId");
-        assertThat("レコード取得数", mailRequestList.size(), is(3));
-        assertThat("メールリクエストIDが1", mailRequestList.get(0).mailRequestId, is("1"));
-        assertThat("ステータスが「送信成功」になっているはず", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
-        assertThat("送信日時が登録されているはず", mailRequestList.get(0).sendDatetime, is(notNullValue()));
-        assertThat("メールリクエストIDが2", mailRequestList.get(1).mailRequestId, is("2"));
-        assertThat("ステータスが「送信失敗」になっているはず", mailRequestList.get(1).status, is(mailConfig.getStatusFailure()));
-        assertThat("送信日時が登録されていないはず", mailRequestList.get(1).sendDatetime, is(nullValue()));
-        assertThat("メールリクエストIDが3", mailRequestList.get(2).mailRequestId, is("3"));
-        assertThat("ステータスが「送信成功」になっているはず", mailRequestList.get(2).status, is(mailConfig.getStatusSent()));
-        assertThat("送信日時が登録されているはず", mailRequestList.get(2).sendDatetime, is(notNullValue()));
-
-    }
-
-    public static class MailTestErrorHandler implements Handler<Object, Object> {
-
-        protected static Exception catched;
-
-        /** {@inheritDoc} */
-        public Object handle(Object req, ExecutionContext ctx) {
-
-            try {
-                return ctx.handleNext(req);
-            } catch (RuntimeException e) {
-                catched = e;
-                throw e;
-            }
-        }
     }
 }

@@ -1,6 +1,6 @@
 package nablarch.common.mail;
 
-import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 
@@ -23,11 +23,9 @@ import javax.mail.PasswordAuthentication;
 import javax.mail.Session;
 import javax.mail.Store;
 
-import nablarch.test.support.log.app.OnMemoryLogWriter;
-import nablarch.fw.ExecutionContext;
-import nablarch.fw.Handler;
 import nablarch.fw.results.TransactionAbnormalEnd;
 import nablarch.test.support.db.helper.VariousDbTestHelper;
+import nablarch.test.support.log.app.OnMemoryLogWriter;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -123,22 +121,6 @@ public class MailTestSupport {
         assertThat("エラーの型", catched, instanceOf(TransactionAbnormalEnd.class));
         assertThat("終了コード", ((TransactionAbnormalEnd) catched).getStatusCode(), is(abnormalEndExitCode));
         assertThat("メッセージ", catched.getMessage(), is("メール送信に失敗しました。 mailRequestId=[" + mailReqestId + "]"));
-    }
-
-    public static class MailTestErrorHandler implements Handler<Object, Object> {
-
-        protected static Exception catched;
-
-        /** {@inheritDoc} */
-        public Object handle(Object req, ExecutionContext ctx) {
-
-            try {
-                return ctx.handleNext(req);
-            } catch (RuntimeException e) {
-                catched = e;
-                throw e;
-            }
-        }
     }
 
     public void assertAttachedFile(Part part, File file) throws IOException, MessagingException {

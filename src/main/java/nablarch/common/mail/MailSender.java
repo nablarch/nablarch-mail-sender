@@ -18,15 +18,17 @@ import javax.mail.internet.MimeMultipart;
 import javax.mail.util.ByteArrayDataSource;
 
 import nablarch.core.db.statement.SqlRow;
+import nablarch.core.log.Logger;
+import nablarch.core.log.LoggerManager;
 import nablarch.core.repository.SystemRepository;
 import nablarch.core.util.annotation.Published;
 import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
 import nablarch.fw.Result;
-import nablarch.fw.reader.DatabaseRecordListener;
-import nablarch.fw.results.TransactionAbnormalEnd;
 import nablarch.fw.action.BatchAction;
+import nablarch.fw.reader.DatabaseRecordListener;
 import nablarch.fw.reader.DatabaseRecordReader;
+import nablarch.fw.results.TransactionAbnormalEnd;
 
 /**
  * メール送信要求管理テーブル上の各レコードごとにメール送信を行うバッチアクション。
@@ -37,6 +39,9 @@ public class MailSender extends BatchAction<SqlRow> {
 
     /** メール送信バッチを識別するプロセスID */
     private final String processId = UUID.randomUUID().toString();
+
+    /** ロガー */
+    private static final Logger LOGGER = LoggerManager.get(MailSender.class);
 
     /**
      * コンストラクタ。
@@ -67,7 +72,11 @@ public class MailSender extends BatchAction<SqlRow> {
         // メールセッションの取得
         Session session = createMailSession(mailRequest.getReturnPath(), mailSenderConfig);
 
+        final MailConfig mailConfig = SystemRepository.get("mailConfig");
         try {
+            // 事前にステータスを送信済みに更新する。
+            updateToSuccess(data, context);
+            
             // 差し戻し先メールアドレスのチェック
             containsInvalidCharacter(mailRequest.getReturnPath(), mailRequestId);
 
@@ -83,11 +92,23 @@ public class MailSender extends BatchAction<SqlRow> {
             // 設定の保存とメール送信
             mimeMessage.saveChanges();
             Transport.send(mimeMessage);
+            writeLog(mailConfig.getSendSuccessMessageId(), mailRequestId);
         } catch (MessagingException e) {
-            MailConfig mailConfig = SystemRepository.get("mailConfig");
-            throw new TransactionAbnormalEnd(
-                    mailConfig.getAbnormalEndExitCode(), e,
-                    mailConfig.getSendFailureCode(), mailRequestId);
+            final TransactionAbnormalEnd transactionAbnormalEnd = new TransactionAbnormalEnd(
+                    mailConfig.getAbnormalEndExitCode(),
+                    e,
+                    mailConfig.getSendFailureCode(),
+                    mailRequestId);
+            LOGGER.logError(transactionAbnormalEnd.getMessage(), e);
+            try {
+                updateToFailed(data, context);
+            } catch (RuntimeException updateException) {
+                throw new StatusUpdateFailedException(
+                        "failed to update unsent status. "
+                                + "need to apply a patch to change the status to unsent. " 
+                                + "target data=[mailRequestId = " + mailRequestId + ']', updateException);
+            }
+            return transactionAbnormalEnd;
         }
         return new Result.Success();
     }
@@ -282,13 +303,13 @@ public class MailSender extends BatchAction<SqlRow> {
     }
 
     /**
-     * {@inheritDoc}
-     * <p/>
      * 処理ステータスを異常終了に更新する。
+     *
+     * @param data 送信対象データ
+     * @param context 実行コンテキスト
      */
-    @Override
     @Published(tag = "architect")
-    protected void transactionFailure(SqlRow data, ExecutionContext context) {
+    protected void updateToFailed(final SqlRow data, final ExecutionContext context) {
         MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
         MailRequestTable.MailRequest mailRequest = mailRequestTable.getMailRequest(data);
         MailConfig mailConfig = SystemRepository.get("mailConfig");
@@ -297,19 +318,34 @@ public class MailSender extends BatchAction<SqlRow> {
     }
 
     /**
-     * {@inheritDoc}
-     * <p/>
-     * 処理ステータスを正常終了に更新し、送信ログを出力する。
+     * 処理ステータスを正常終了に更新する。
+     *
+     * @param data 送信対象データ
+     * @param context 実行コンテキスト
      */
-    @Override
     @Published(tag = "architect")
-    protected void transactionSuccess(SqlRow data, ExecutionContext context) {
+    protected void updateToSuccess(final SqlRow data, final ExecutionContext context) {
         MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
         MailRequestTable.MailRequest mailRequest = mailRequestTable.getMailRequest(data);
         MailConfig mailConfig = SystemRepository.get("mailConfig");
 
         String mailRequestId = mailRequest.getMailRequestId();
         mailRequestTable.updateStatus(mailRequestId, mailConfig.getStatusSent());
-        writeLog(mailConfig.getSendSuccessMessageId(), mailRequestId);
+    }
+
+    /**
+     * ステータスの更新に失敗したことを表す例外クラス。
+     */
+    public static class StatusUpdateFailedException extends RuntimeException {
+
+        /**
+         * メッセージと起因例外を持つ例外を構築する。
+         *
+         * @param message メッセージ
+         * @param cause 起因例外
+         */
+        public StatusUpdateFailedException(final String message, final Throwable cause) {
+            super(message, cause);
+        }
     }
 }
