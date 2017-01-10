@@ -33,15 +33,18 @@
         <property name="interval" value="500" />
     </component>
 
+    <component name="statusUpdateTransaction" class="nablarch.core.db.transaction.SimpleDbTransactionManager">
+      <property name="dbTransactionName" value="statusUpdateTransaction" />
+      <property name="connectionFactory" ref="connectionFactory" />
+      <property name="transactionFactory" ref="jdbcTransactionFactory" />
+    </component>
+
     <!-- ハンドラキュー構成 -->
     <list name="handlerQueue">
         <!-- ステータスコードを終了コードに変換するハンドラ -->
         <component class="nablarch.fw.handler.StatusCodeConvertHandler" />
         <!-- グローバルエラーハンドラ -->
         <component class="nablarch.fw.handler.GlobalErrorHandler" />
-        <!-- エラー検証用の専用ハンドラ -->
-        <component
-            class="nablarch.common.mail.MailSenderTest$MailTestErrorHandler" />
         <!-- スレッドコンテキスト設定ハンドラ -->
         <component-ref name="threadContextHandler" />
         <!-- ２重起動防止ハンドラ -->

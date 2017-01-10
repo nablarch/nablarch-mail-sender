@@ -297,14 +297,20 @@ public class MailRequestTable implements Initializable {
      * @param mailRequestId メールリクエストID
      * @param status ステータス
      */
-    public void updateStatus(String mailRequestId, String status) {
-        AppDbConnection connection = DbConnectionContext.getConnection();
-        SqlPStatement statement = connection.prepareStatement(updateStatusSql);
-        statement.setString(1, status);
-        statement.setTimestamp(2, SystemTimeUtil.getTimestamp());
-        statement.setString(3, mailRequestId);
-        statement.setString(4, mailConfig.getStatusUnsent());
-        statement.executeUpdate();
+    public void updateStatus(final String mailRequestId, final String status) {
+        final SimpleDbTransactionManager transaction = SystemRepository.get("statusUpdateTransaction");
+        new SimpleDbTransactionExecutor<Void>(transaction) {
+            @Override
+            public Void execute(final AppDbConnection connection) {
+                final SqlPStatement statement = connection.prepareStatement(updateStatusSql);
+                statement.setString(1, status);
+                statement.setTimestamp(2, SystemTimeUtil.getTimestamp());
+                statement.setString(3, mailRequestId);
+                statement.setString(4, mailConfig.getStatusUnsent());
+                statement.executeUpdate();
+                return null;
+            }
+        }.doTransaction();
     }
 
     /**
@@ -315,13 +321,19 @@ public class MailRequestTable implements Initializable {
      * @param mailRequestId メールリクエストID
      * @param status ステータス
      */
-    public void updateFailureStatus(String mailRequestId, String status) {
-        AppDbConnection connection = DbConnectionContext.getConnection();
-        SqlPStatement statement = connection.prepareStatement(updateFailureStatusSql);
-        statement.setString(1, status);
-        statement.setString(2, mailRequestId);
-        statement.setString(3, mailConfig.getStatusUnsent());
-        statement.executeUpdate();
+    public void updateFailureStatus(final String mailRequestId, final String status) {
+        final SimpleDbTransactionManager transaction = SystemRepository.get("statusUpdateTransaction");
+        new SimpleDbTransactionExecutor<Void>(transaction) {
+            @Override
+            public Void execute(final AppDbConnection connection) {
+                final SqlPStatement statement = connection.prepareStatement(updateFailureStatusSql);
+                statement.setString(1, status);
+                statement.setString(2, mailRequestId);
+                statement.setString(3, mailConfig.getStatusSent());
+                statement.executeUpdate();
+                return null;
+            }
+        }.doTransaction();
     }
 
     /**
@@ -437,11 +449,12 @@ public class MailRequestTable implements Initializable {
     private String createUpdateFailureStatusSql() {
         return "UPDATE " + tableName
                 + " SET "
-                + statusColumnName + " = ? "
+                + statusColumnName + " = ?, "
+                + sendDateTimeColumnName + " = null "
                 + "WHERE " + mailRequestIdColumnName + " = ?"
                 + " AND " + statusColumnName + " = ?";
     }
-
+    
     /**
      * レコードを登録するためのINSERT文を生成する。
      *
