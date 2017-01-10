@@ -1,5 +1,5 @@
 group = 'com.nablarch.framework'
-version = '1.1.0'
+version = '1.2.0'
 description = 'メール送信機能(NAFから外れる)'
 
 buildscript {
