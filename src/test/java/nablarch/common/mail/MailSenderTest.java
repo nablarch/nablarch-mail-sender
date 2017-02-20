@@ -8,6 +8,9 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.sql.SQLException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 
 import javax.mail.Address;
@@ -22,6 +25,7 @@ import javax.mail.Store;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage.RecipientType;
 
+import nablarch.core.date.BasicSystemTimeProvider;
 import nablarch.core.date.SystemTimeUtil;
 import nablarch.core.util.FileUtil;
 import nablarch.fw.ExecutionContext;
@@ -68,6 +72,19 @@ public class MailSenderTest extends MailTestSupport {
         VariousDbTestHelper.setUpTable(new MailBatchRequest("SENDMAIL00", "メール送信バッチ", "0", "0", "1"));
     }
 
+    public static class TestSystemTimeProvider extends BasicSystemTimeProvider {
+
+        @Override
+        public Date getDate() {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+                return sdf.parse("2017/01/23 12:34:56");
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
     /**
      * {@link Main#execute(CommandLine)}のテスト。
      * <p/>
@@ -96,7 +113,7 @@ public class MailSenderTest extends MailTestSupport {
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
-                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch/common/mail/MailSenderTestSentDate.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
         assertThat("正常終了なので戻り値は0となる。", execute, is(0));
@@ -146,6 +163,8 @@ public class MailSenderTest extends MailTestSupport {
         String messageSubject = message.getSubject();
         assertThat("件名", messageSubject, is(subject));
 
+        assertThat("送信日時", message.getSentDate(), is(new TestSystemTimeProvider().getDate()));
+
         assertThat("Content-Type", message.getContentType(), containsString("text/plain"));
         assertThat("charset", message.getContentType(), containsString(charset));
 
@@ -192,7 +211,7 @@ public class MailSenderTest extends MailTestSupport {
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
-                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch/common/mail/MailSenderTestSentDate.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
         assertThat("正常終了なので戻り値は0となる。", execute, is(0));
@@ -234,6 +253,8 @@ public class MailSenderTest extends MailTestSupport {
 
         String messageSubject = message1.getSubject();
         assertThat("件名", messageSubject, is(subject));
+
+        assertThat("送信日時", message1.getSentDate(), is(new TestSystemTimeProvider().getDate()));
 
         assertThat("Content-Type", message1.getContentType(), containsString("multipart/mixed"));
 
@@ -323,7 +344,7 @@ public class MailSenderTest extends MailTestSupport {
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
-                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch/common/mail/MailSenderTestSentDate.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
         assertThat("正常終了なので戻り値は0となる。", execute, is(0));
@@ -370,6 +391,8 @@ public class MailSenderTest extends MailTestSupport {
 
         String messageSubject = message1.getSubject();
         assertThat("件名", messageSubject, is(subject));
+
+        assertThat("送信日時", message1.getSentDate(), is(new TestSystemTimeProvider().getDate()));
 
         assertThat("Content-Type", message1.getContentType(), containsString("multipart/mixed"));
 
