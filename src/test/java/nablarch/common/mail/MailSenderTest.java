@@ -44,6 +44,8 @@ import org.junit.runner.RunWith;
 
 /**
  * {@link MailSender}のテストクラス。
+ *
+ * メールサーバーソフトのJamesのセットアップと、アカウントの追加については、README.mdファイルを参照すること。
  */
 @RunWith(DatabaseTestRunner.class)
 public class MailSenderTest extends MailTestSupport {
@@ -113,7 +115,7 @@ public class MailSenderTest extends MailTestSupport {
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
-                "nablarch/common/mail/MailSenderTestSentDate.xml", "-requestPath",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
         assertThat("正常終了なので戻り値は0となる。", execute, is(0));
@@ -211,7 +213,7 @@ public class MailSenderTest extends MailTestSupport {
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
-                "nablarch/common/mail/MailSenderTestSentDate.xml", "-requestPath",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
         assertThat("正常終了なので戻り値は0となる。", execute, is(0));
@@ -344,7 +346,7 @@ public class MailSenderTest extends MailTestSupport {
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
-                "nablarch/common/mail/MailSenderTestSentDate.xml", "-requestPath",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
         assertThat("正常終了なので戻り値は0となる。", execute, is(0));
