@@ -14,11 +14,14 @@ import javax.mail.Address;
 import javax.mail.Authenticator;
 import javax.mail.Folder;
 import javax.mail.Message;
+import javax.mail.MessagingException;
 import javax.mail.Multipart;
 import javax.mail.Part;
 import javax.mail.PasswordAuthentication;
+import javax.mail.SendFailedException;
 import javax.mail.Session;
 import javax.mail.Store;
+import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage.RecipientType;
 
@@ -607,7 +610,7 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は20となる。", execute, is(20));
+        assertThat("送信に失敗しても処理は成功なので0", execute, is(0));
 
         // ----- assert log -----
         //LogVerifier.verify("assert log");
@@ -653,7 +656,7 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は20となる。", execute, is(20));
+        assertThat("送信に失敗しても処理は成功なので0", execute, is(0));
 
         // ----- assert log -----
         //LogVerifier.verify("assert log");
@@ -688,7 +691,7 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は20となる。", execute, is(20));
+        assertThat("送信に失敗しても処理は成功なので0", execute, is(0));
     }
 
     /**
@@ -1044,5 +1047,239 @@ public class MailSenderTest extends MailTestSupport {
         // 送信されなかった1件が対象となる
         OnMemoryLogWriter.assertLogContains("writer.memory", "-INFO- メール送信要求が 1 件あります。");
 
+    }
+
+    /**
+     * メールアドレスの文字列が不正で、インスタンス生成に失敗する時のテスト(From)
+     */
+    @Test
+    public void testLoggingAddressExceptionFromAddress() {
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "異常系 From アドレスのインスタンス生成失敗";
+
+        final String invalidAddress = from + "@" + from;
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, invalidAddress, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory", "Failed to instantiate mail address. Error message:[", "] Mail address:[" + invalidAddress +"]");
+    }
+
+    /**
+     * メールアドレスの文字列が不正で、インスタンス生成に失敗する時のテスト(ReplyTo)
+     */
+    @Test
+    public void testLoggingAddressExceptionReplyToAddress() {
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "異常系 ReplyTo アドレスのインスタンス生成失敗";
+        final String invalidAddress = replyTo + "@" + replyTo;
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, from, invalidAddress, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory", "Failed to instantiate mail address. Error message:[", "] Mail address:[" + invalidAddress +"]");
+    }
+
+    /**
+     * メールアドレスの文字列が不正で、インスタンス生成に失敗する時のテスト(To)
+     */
+    @Test
+    public void testLoggingAddressExceptionSendAddressTO() {
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "異常系 送信アドレスのインスタンス生成失敗";
+        final String invalidAddress = to1 + "@" + to1;
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), invalidAddress),
+                new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeCC(), cc1),
+                new MailRecipient(mailRequestId, 3L, mailConfig.getRecipientTypeBCC(), bcc1));
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory", "Failed to instantiate mail address. Error message:[", "] Mail address:[" + invalidAddress +"]");
+    }
+
+    /**
+     * メールアドレスの文字列が不正で、インスタンス生成に失敗する時のテスト(CC)
+     */
+    @Test
+    public void testLoggingAddressExceptionSendAddressCC() {
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "異常系 送信アドレスのインスタンス生成失敗";
+        final String invalidAddress = cc1 + "@" + cc1;
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1),
+                new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeCC(), invalidAddress),
+                new MailRecipient(mailRequestId, 3L, mailConfig.getRecipientTypeBCC(), bcc1));
+
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory", "Failed to instantiate mail address. Error message:[", "] Mail address:[" + invalidAddress +"]");
+    }
+
+    /**
+     * メールアドレスの文字列が不正で、インスタンス生成に失敗する時のテスト(BCC)
+     */
+    @Test
+    public void testLoggingAddressExceptionSendAddressBCC() {
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "異常系 送信アドレスのインスタンス生成失敗";
+        final String invalidAddress = bcc1 + "@" + bcc1;
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1),
+                new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeCC(), cc1),
+                new MailRecipient(mailRequestId, 3L, mailConfig.getRecipientTypeBCC(), invalidAddress));
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory", "Failed to instantiate mail address. Error message:[", "] Mail address:[" + invalidAddress +"]");
+    }
+
+    /**
+     * メール送信の実行時に{@link SendFailedException}が発生した場合の詳細ログがERRORに出力されていることのテスト
+     */
+    @Test
+    public void testLoggingSendFailedException() {
+
+        new MockUp<Transport>() {
+
+            @Mock
+            public void send(Message message) throws MessagingException {
+                // 複数要素の場合は、間に", "が入ること
+                final Address[] validSent = {new InternetAddress(to1), new InternetAddress(to2), new InternetAddress(cc1)};
+                // 1要素の場合は、そのまま
+                final Address[] validUnsent = {new InternetAddress(to3)};
+                // 空の配列
+                final Address[] invalid = {};
+                throw new SendFailedException("Test SendFailedException message.", null,
+                        validSent, validUnsent, invalid);
+            }
+        };
+
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "異常系 Transport.Sendで失敗";
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1),
+                new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeTO(), to2),
+                new MailRecipient(mailRequestId, 3L, mailConfig.getRecipientTypeTO(), to3),
+                new MailRecipient(mailRequestId, 4L, mailConfig.getRecipientTypeTO(), cc1));
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "Failed to send a mail. Error message:[Test SendFailedException message.] "
+                        + "Mail RequestId:[1] "
+                        + "Subject:[異常系 Transport.Sendで失敗] "
+                        + "From:[from@localhost] "
+                        + "Sent address:[to1@localhost, to2@localhost, cc1@localhost] "
+                        + "Unsent address:[to3@localhost] "
+                        + "Invalid address:[]");
+    }
+
+    /**
+     * メール送信の実行時に{@link SendFailedException}が発生した場合の詳細ログがERRORに出力されていることのテスト
+     * (例外から取得されるアドレスがnullの場合)
+     */
+    @Test
+    public void testLoggingSendFailedExceptionAddressesNull() {
+
+        new MockUp<Transport>() {
+
+            @Mock
+            public void send(Message message) throws MessagingException {
+                //アドレスはnullにする。
+                final Address[] validSent = null;
+                final Address[] validUnsent = null;
+                final Address[] invalid = null;
+                throw new SendFailedException("Test SendFailedException message.", null,
+                        validSent, validUnsent, invalid);
+            }
+        };
+
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "異常系 Transport.Sendで失敗";
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1),
+                new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeTO(), to2),
+                new MailRecipient(mailRequestId, 3L, mailConfig.getRecipientTypeTO(), to3),
+                new MailRecipient(mailRequestId, 4L, mailConfig.getRecipientTypeCC(), cc1),
+                new MailRecipient(mailRequestId, 5L, mailConfig.getRecipientTypeCC(), cc2),
+                new MailRecipient(mailRequestId, 6L, mailConfig.getRecipientTypeCC(), cc3));
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "Failed to send a mail. Error message:[Test SendFailedException message.] "
+                        + "Mail RequestId:[1] "
+                        + "Subject:[異常系 Transport.Sendで失敗] "
+                        + "From:[from@localhost] "
+                        + "Sent address:[] "
+                        + "Unsent address:[] "
+                        + "Invalid address:[]");
     }
 }

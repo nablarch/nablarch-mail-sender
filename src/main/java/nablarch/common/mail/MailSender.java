@@ -7,7 +7,9 @@ import java.util.UUID;
 
 import javax.activation.DataHandler;
 import javax.activation.DataSource;
+import javax.mail.Address;
 import javax.mail.MessagingException;
+import javax.mail.SendFailedException;
 import javax.mail.Session;
 import javax.mail.Transport;
 import javax.mail.internet.AddressException;
@@ -94,6 +96,20 @@ public class MailSender extends BatchAction<SqlRow> {
             Transport.send(mimeMessage);
             writeLog(mailConfig.getSendSuccessMessageId(), mailRequestId);
         } catch (MessagingException e) {
+            if (e instanceof SendFailedException) {
+                //送信エラーの場合は、詳細をERRORレベルのログに出力する。
+                final SendFailedException sfe = (SendFailedException) e;
+                final String sentAddresses = addressesToString(sfe.getValidSentAddresses());
+                final String unsentAddresses = addressesToString(sfe.getValidUnsentAddresses());
+                final String invalidAddresses = addressesToString(sfe.getInvalidAddresses());
+                LOGGER.logError(
+                        String.format("Failed to send a mail. Error message:[%s] Mail RequestId:[%s] "
+                                        + "Subject:[%s] From:[%s] "
+                                        + "Sent address:[%s] Unsent address:[%s] Invalid address:[%s]",
+                                e.getMessage(), mailRequestId,
+                                mailRequest.getSubject(), mailRequest.getFrom(),
+                                sentAddresses, unsentAddresses, invalidAddresses));
+            }
             final TransactionAbnormalEnd transactionAbnormalEnd = new TransactionAbnormalEnd(
                     mailConfig.getAbnormalEndExitCode(),
                     e,
@@ -111,6 +127,25 @@ public class MailSender extends BatchAction<SqlRow> {
             return transactionAbnormalEnd;
         }
         return new Result.Success();
+    }
+
+    /**
+     * メールアドレスの配列を文字列にする。
+     * @param addresses メールアドレスの配列
+     * @return メールアドレスをカンマで連結した文字列
+     */
+    private static String addressesToString(final Address[] addresses) {
+        if (addresses == null) {
+            return "";
+        }
+        final StringBuilder result = new StringBuilder();
+        for (Address address : addresses) {
+            if (result.length() > 0) {
+                result.append(", ");
+            }
+            result.append(address);
+        }
+        return result.toString();
     }
 
     /**
@@ -141,11 +176,11 @@ public class MailSender extends BatchAction<SqlRow> {
         mimeMessage.setRecipients(MimeMessage.RecipientType.BCC, bcc);
 
         // 送信元の設定
-        mimeMessage.setFrom(new InternetAddress(mailRequest.getFrom()));
+        mimeMessage.setFrom(createInternetAddress(mailRequest.getFrom()));
 
         // 返信先の設定
         InternetAddress[] replyTo = new InternetAddress[1];
-        replyTo[0] = new InternetAddress(mailRequest.getReplyAddress());
+        replyTo[0] = createInternetAddress(mailRequest.getReplyAddress());
         mimeMessage.setReplyTo(replyTo);
 
         // 件名のチェック
@@ -237,24 +272,37 @@ public class MailSender extends BatchAction<SqlRow> {
      * @param recipientType 宛先区分
      * @param mailRecipientTable 宛先メールアドレスの配列
      * @return メールアドレスの配列
+     * @throws AddressException メールアドレスの生成に失敗した場合
      */
     private InternetAddress[] getAddresses(String mailRequestId,
-            String recipientType, MailRecipientTable mailRecipientTable) {
+            String recipientType, MailRecipientTable mailRecipientTable) throws AddressException {
 
         List<? extends MailRecipientTable.MailRecipient> mailRecipients = mailRecipientTable.find(mailRequestId,
                 recipientType);
 
         List<InternetAddress> mailAddresses = new ArrayList<InternetAddress>();
         for (MailRecipientTable.MailRecipient mailRecipient : mailRecipients) {
-            try {
-                mailAddresses.add(new InternetAddress(mailRecipient.getMailAddress()));
-            } catch (AddressException e) {
-                // メールアドレスはバリデーション済みのため、到達しないはず。
-                throw new IllegalStateException(e);
-            }
+            final String address = mailRecipient.getMailAddress();
+            mailAddresses.add(createInternetAddress(address));
         }
 
         return mailAddresses.toArray(new InternetAddress[mailAddresses.size()]);
+    }
+
+    /**
+     * メールアドレスを生成する。{@link AddressException}が発生した場合は、ERRORログに出力し、AddressExceptionを送出する。
+     * @param address メールアドレスの元となる文字列
+     * @return 生成したメールアドレス
+     * @throws AddressException メールアドレスの生成に失敗した場合
+     */
+    private static InternetAddress createInternetAddress(final String address) throws AddressException {
+        try {
+            return new InternetAddress(address);
+        } catch (AddressException e) {
+            LOGGER.logError(String.format("Failed to instantiate mail address. Error message:[%s] Mail address:[%s]",
+                            e.getMessage(), address), e);
+            throw e;
+        }
     }
 
     /**
