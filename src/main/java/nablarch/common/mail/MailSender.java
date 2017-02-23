@@ -17,6 +17,7 @@ import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
 import javax.mail.util.ByteArrayDataSource;
 
+import nablarch.core.date.SystemTimeUtil;
 import nablarch.core.db.statement.SqlRow;
 import nablarch.core.repository.SystemRepository;
 import nablarch.core.util.annotation.Published;
@@ -132,6 +133,9 @@ public class MailSender extends BatchAction<SqlRow> {
 
         // 件名の設定
         mimeMessage.setSubject(mailRequest.getSubject(), mailRequest.getCharset());
+
+        // 送信日時の設定
+        mimeMessage.setSentDate(SystemTimeUtil.getDate());
 
         return mimeMessage;
     }

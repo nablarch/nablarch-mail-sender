@@ -8,6 +8,9 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.sql.SQLException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 
 import javax.mail.Address;
@@ -22,6 +25,7 @@ import javax.mail.Store;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage.RecipientType;
 
+import nablarch.core.date.BasicSystemTimeProvider;
 import nablarch.core.date.SystemTimeUtil;
 import nablarch.core.util.FileUtil;
 import nablarch.fw.ExecutionContext;
@@ -40,6 +44,8 @@ import org.junit.runner.RunWith;
 
 /**
  * {@link MailSender}のテストクラス。
+ *
+ * メールサーバーソフトのJamesのセットアップと、アカウントの追加については、README.mdファイルを参照すること。
  */
 @RunWith(DatabaseTestRunner.class)
 public class MailSenderTest extends MailTestSupport {
@@ -66,6 +72,19 @@ public class MailSenderTest extends MailTestSupport {
                 new MailTestMessage("REQ_COUNT0", "en", "{0} records of mail request selected."));
 
         VariousDbTestHelper.setUpTable(new MailBatchRequest("SENDMAIL00", "メール送信バッチ", "0", "0", "1"));
+    }
+
+    public static class TestSystemTimeProvider extends BasicSystemTimeProvider {
+
+        @Override
+        public Date getDate() {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+                return sdf.parse("2017/01/23 12:34:56");
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     /**
@@ -145,6 +164,8 @@ public class MailSenderTest extends MailTestSupport {
 
         String messageSubject = message.getSubject();
         assertThat("件名", messageSubject, is(subject));
+
+        assertThat("送信日時", message.getSentDate(), is(new TestSystemTimeProvider().getDate()));
 
         assertThat("Content-Type", message.getContentType(), containsString("text/plain"));
         assertThat("charset", message.getContentType(), containsString(charset));
@@ -234,6 +255,8 @@ public class MailSenderTest extends MailTestSupport {
 
         String messageSubject = message1.getSubject();
         assertThat("件名", messageSubject, is(subject));
+
+        assertThat("送信日時", message1.getSentDate(), is(new TestSystemTimeProvider().getDate()));
 
         assertThat("Content-Type", message1.getContentType(), containsString("multipart/mixed"));
 
@@ -370,6 +393,8 @@ public class MailSenderTest extends MailTestSupport {
 
         String messageSubject = message1.getSubject();
         assertThat("件名", messageSubject, is(subject));
+
+        assertThat("送信日時", message1.getSentDate(), is(new TestSystemTimeProvider().getDate()));
 
         assertThat("Content-Type", message1.getContentType(), containsString("multipart/mixed"));
 

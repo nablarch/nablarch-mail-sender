@@ -107,8 +107,8 @@
         </property>
     </component>
 
-    <component name="systemTimeProvider"
-        class="nablarch.core.date.BasicSystemTimeProvider" />
+    <!-- メールの送信日時をテストするため、SystemTimeUtil.getDateを固定化するSystemTimeProvider -->
+    <component name="systemTimeProvider" class="nablarch.common.mail.MailSenderTest$TestSystemTimeProvider" />
 
     <!-- オブジェクトの情報のキャッシュ設定 -->
     <component name="statementValueObjectCache" class="nablarch.core.cache.BasicStaticDataCache">
