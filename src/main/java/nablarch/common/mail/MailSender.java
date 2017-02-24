@@ -28,6 +28,8 @@ import nablarch.fw.DataReader;
 import nablarch.fw.ExecutionContext;
 import nablarch.fw.Result;
 import nablarch.fw.action.BatchAction;
+import nablarch.fw.handler.retry.RetryableException;
+import nablarch.fw.launcher.ProcessAbnormalEnd;
 import nablarch.fw.reader.DatabaseRecordListener;
 import nablarch.fw.reader.DatabaseRecordReader;
 import nablarch.fw.results.TransactionAbnormalEnd;
@@ -78,7 +80,7 @@ public class MailSender extends BatchAction<SqlRow> {
         try {
             // 事前にステータスを送信済みに更新する。
             updateToSuccess(data, context);
-            
+
             // 差し戻し先メールアドレスのチェック
             containsInvalidCharacter(mailRequest.getReturnPath(), mailRequestId);
 
@@ -95,38 +97,148 @@ public class MailSender extends BatchAction<SqlRow> {
             mimeMessage.saveChanges();
             Transport.send(mimeMessage);
             writeLog(mailConfig.getSendSuccessMessageId(), mailRequestId);
-        } catch (MessagingException e) {
-            if (e instanceof SendFailedException) {
-                //送信エラーの場合は、詳細をERRORレベルのログに出力する。
-                final SendFailedException sfe = (SendFailedException) e;
-                final String sentAddresses = addressesToString(sfe.getValidSentAddresses());
-                final String unsentAddresses = addressesToString(sfe.getValidUnsentAddresses());
-                final String invalidAddresses = addressesToString(sfe.getInvalidAddresses());
-                LOGGER.logError(
-                        String.format("Failed to send a mail. Error message:[%s] Mail RequestId:[%s] "
-                                        + "Subject:[%s] From:[%s] "
-                                        + "Sent address:[%s] Unsent address:[%s] Invalid address:[%s]",
-                                e.getMessage(), mailRequestId,
-                                mailRequest.getSubject(), mailRequest.getFrom(),
-                                sentAddresses, unsentAddresses, invalidAddresses));
-            }
-            final TransactionAbnormalEnd transactionAbnormalEnd = new TransactionAbnormalEnd(
-                    mailConfig.getAbnormalEndExitCode(),
-                    e,
-                    mailConfig.getSendFailureCode(),
-                    mailRequestId);
-            LOGGER.logError(transactionAbnormalEnd.getMessage(), e);
+        } catch(AddressException e) {
+            // 必須アドレスの変換例外による送信失敗なので、トランザクションの異常終了とする。
+            return createTransactionAbnormalEnd(data, context, mailRequest, mailConfig, e);
+        } catch(InvalidCharacterException e) {
+            // フィールドの文字列不正例外による送信失敗なので、トランザクションの異常終了とする。
+            return createTransactionAbnormalEnd(data, context, mailRequest, mailConfig, e);
+        } catch(SendFailedException e) {
+            // 送信エラーの場合は、アドレス等の詳細をERRORレベルのログに出力する。
+            writeSendFailedDetailsLog(mailRequest, e);
+            // 送信エラーによる送信失敗なので、トランザクションの異常終了とする。
+            return createTransactionAbnormalEnd(data, context, mailRequest, mailConfig, e);
+        }
+        catch (MessagingException e) {
             try {
-                updateToFailed(data, context);
-            } catch (RuntimeException updateException) {
-                throw new StatusUpdateFailedException(
-                        "failed to update unsent status. "
-                                + "need to apply a patch to change the status to unsent. " 
-                                + "target data=[mailRequestId = " + mailRequestId + ']', updateException);
+                // リトライ可能例外かチェック
+                checkAndThrowRetryableException(data, context, mailRequest, e);
+            } catch (RetryableException re) {
+                try {
+                    // 送信ステータスを未送信に戻す。
+                    updateToUnsent(data, context);
+                } catch (RuntimeException updateException) {
+                    throw new StatusUpdateFailedException(
+                            "failed to update unsent status. "
+                                    + "need to apply a patch to change the status to unsent. "
+                                    + "target data=[mailRequestId = " + mailRequest.getMailRequestId() + ']',
+                            updateException);
+                }
+                throw re;
             }
-            return transactionAbnormalEnd;
+            // 送信失敗以外のMessagingExceptionで、リトライ不可のものは、プロセスの異常終了とする。
+            return createProcessAbnormalEnd(data, context, mailRequest, mailConfig, e);
         }
         return new Result.Success();
+    }
+
+    /**
+     * メール送信失敗時の{@link SendFailedException}例外を補足した場合に、詳細メッセージをログに出力する。
+     * <p/>
+     * メール送信失敗時に、出力するログの記述やデータベースへの書き込み等、独自の処理を実施したい場合は
+     * 本メソッドをオーバーライドすることで行うことができる。
+     * @param mailRequest メール要求
+     * @param e メール送信失敗時の{@link SendFailedException}例外
+     */
+    @Published(tag = "architect")
+    protected void writeSendFailedDetailsLog(final MailRequestTable.MailRequest mailRequest,
+            final SendFailedException e) {
+        final String sentAddresses = addressesToString(e.getValidSentAddresses());
+        final String unsentAddresses = addressesToString(e.getValidUnsentAddresses());
+        final String invalidAddresses = addressesToString(e.getInvalidAddresses());
+        LOGGER.logError(
+                String.format("Failed to send a mail. Error message:[%s] Mail RequestId:[%s] "
+                                + "Subject:[%s] From:[%s] "
+                                + "Sent address:[%s] Unsent address:[%s] Invalid address:[%s]",
+                        e.getMessage(), mailRequest.getMailRequestId(),
+                        mailRequest.getSubject(), mailRequest.getFrom(),
+                        sentAddresses, unsentAddresses, invalidAddresses));
+    }
+
+    /**
+     * メール送信時に送信失敗を表す{@link MessagingException}が発生した場合のトランザクションの異常終了状態を生成して返す。
+     * @param data 入力データ（メール送信要求のレコード）
+     * @param context 実行コンテキスト
+     * @param mailRequest メール送信要求
+     * @param mailConfig メール設定
+     * @param e メール送信時のMessagingException
+     * @return 業務トランザクションの異常終了例外
+     */
+    private Result createTransactionAbnormalEnd(final SqlRow data, final ExecutionContext context,
+            final MailRequestTable.MailRequest mailRequest, final MailConfig mailConfig, final MessagingException e) {
+        final TransactionAbnormalEnd transactionAbnormalEnd = new TransactionAbnormalEnd(
+                mailConfig.getAbnormalEndExitCode(),
+                e,
+                mailConfig.getSendFailureCode(),
+                mailRequest.getMailRequestId());
+        LOGGER.logError(transactionAbnormalEnd.getMessage(), e);
+        writeErrorLog(data, mailConfig.getSendFailureCode(), mailRequest.getMailRequestId());
+
+        // 送信ステータスを送信失敗にする。
+        try {
+            updateToFailed(data, context);
+        } catch (RuntimeException updateException) {
+            throw new StatusUpdateFailedException(
+                    "failed to update unsent status. "
+                            + "need to apply a patch to change the status to unsent. "
+                            + "target data=[mailRequestId = " + mailRequest.getMailRequestId() + ']', updateException);
+        }
+        return transactionAbnormalEnd;
+    }
+
+    /**
+     * メール送信時に{@link MessagingException}が発生した場合のプロセスの異常終了状態を生成して返す。
+     * @param data 入力データ（メール送信要求のレコード）
+     * @param context 実行コンテキスト
+     * @param mailRequest メール送信要求
+     * @param mailConfig メール設定
+     * @param e メール送信時のMessagingException
+     * @return アプリケーションの異常終了例外
+     */
+    private Result createProcessAbnormalEnd(final SqlRow data, final ExecutionContext context,
+            final MailRequestTable.MailRequest mailRequest, final MailConfig mailConfig, final MessagingException e) {
+        final ProcessAbnormalEnd processAbnormalEnd = new ProcessAbnormalEnd(
+                mailConfig.getAbnormalEndExitCode(),
+                e,
+                mailConfig.getSendFailureCode(),
+                mailRequest.getMailRequestId());
+        LOGGER.logError(processAbnormalEnd.getMessage(), e);
+        writeErrorLog(data, mailConfig.getSendFailureCode(), mailRequest.getMailRequestId());
+
+        // 送信ステータスを送信失敗にする。
+        try {
+            updateToFailed(data, context);
+        } catch (RuntimeException updateException) {
+            throw new StatusUpdateFailedException(
+                    "failed to update unsent status. "
+                            + "need to apply a patch to change the status to unsent. "
+                            + "target data=[mailRequestId = " + mailRequest.getMailRequestId() + ']', updateException);
+        }
+        return processAbnormalEnd;
+    }
+
+    /**
+     * メール送信時の{@link MessagingException}例外から、リトライ可能かどうかを判断し、{@link RetryableException}を送出する。
+     * 本メソッドでRetryableExceptionを送出した場合は、メール送信要求は、「未送信」の状態に設定される。
+     * 本メソッドでRetryableExceptionを送出しなかった場合は、このハンドラの{@link #handle(SqlRow, ExecutionContext)}は{@link ProcessAbnormalEnd}を返す。
+     *
+     * <p/>
+     * 本クラスでは、すべてのMessagingExceptionをRetryableExceptionとして返すが、派生クラスでオーバーライドすることにより
+     * 例外の種別や元例外等の情報を元にリトライするかどうかのハンドルを行うことができる。
+     * @param data 入力データ（メール送信要求のレコード）
+     * @param context 実行コンテキスト
+     * @param mailRequest メール送信要求
+     * @param e メール送信時のMessagingException
+     * @throws RetryableException リトライを行う場合、送出する。
+     */
+    @Published(tag = "architect")
+    protected void checkAndThrowRetryableException(final SqlRow data, final ExecutionContext context,
+            final MailRequestTable.MailRequest mailRequest, final MessagingException e) throws RetryableException{
+        //原因が接続エラーの場合は、リトライ可能と判断し、RetryableExceptionを送出する。
+        throw new RetryableException(
+                String.format(
+                        "Failed to send a mail, will be retried to send later. Mail RequestId:[%s], Error message:[%s]",
+                        mailRequest.getMailRequestId(), e.getMessage()), e);
     }
 
     /**
@@ -175,13 +287,17 @@ public class MailSender extends BatchAction<SqlRow> {
         mimeMessage.setRecipients(MimeMessage.RecipientType.CC, cc);
         mimeMessage.setRecipients(MimeMessage.RecipientType.BCC, bcc);
 
-        // 送信元の設定
+        // 送信元の設定 from は必須であるため例外は無視しない。
         mimeMessage.setFrom(createInternetAddress(mailRequest.getFrom()));
 
         // 返信先の設定
-        InternetAddress[] replyTo = new InternetAddress[1];
-        replyTo[0] = createInternetAddress(mailRequest.getReplyAddress());
-        mimeMessage.setReplyTo(replyTo);
+        try {
+            InternetAddress[] replyTo = new InternetAddress[1];
+            replyTo[0] = createInternetAddress(mailRequest.getReplyAddress());
+            mimeMessage.setReplyTo(replyTo);
+        } catch (AddressException ignore) {
+            // 返信先のアドレス変換失敗は、ログ出力のみ行い、処理は継続する。
+        }
 
         // 件名のチェック
         containsInvalidCharacter(mailRequest.getSubject(), mailRequestId);
@@ -272,10 +388,9 @@ public class MailSender extends BatchAction<SqlRow> {
      * @param recipientType 宛先区分
      * @param mailRecipientTable 宛先メールアドレスの配列
      * @return メールアドレスの配列
-     * @throws AddressException メールアドレスの生成に失敗した場合
      */
-    private InternetAddress[] getAddresses(String mailRequestId,
-            String recipientType, MailRecipientTable mailRecipientTable) throws AddressException {
+    private static InternetAddress[] getAddresses(String mailRequestId,
+            String recipientType, MailRecipientTable mailRecipientTable) {
 
         List<? extends MailRecipientTable.MailRecipient> mailRecipients = mailRecipientTable.find(mailRequestId,
                 recipientType);
@@ -283,7 +398,12 @@ public class MailSender extends BatchAction<SqlRow> {
         List<InternetAddress> mailAddresses = new ArrayList<InternetAddress>();
         for (MailRecipientTable.MailRecipient mailRecipient : mailRecipients) {
             final String address = mailRecipient.getMailAddress();
-            mailAddresses.add(createInternetAddress(address));
+            try {
+                final InternetAddress mailAddress = createInternetAddress(address);
+                mailAddresses.add(mailAddress);
+            } catch (AddressException ignore) {
+                // 送信先のアドレス変換失敗は、ログ出力のみ行い、処理は継続する。
+            }
         }
 
         return mailAddresses.toArray(new InternetAddress[mailAddresses.size()]);
@@ -363,6 +483,21 @@ public class MailSender extends BatchAction<SqlRow> {
         MailConfig mailConfig = SystemRepository.get("mailConfig");
 
         mailRequestTable.updateFailureStatus(mailRequest.getMailRequestId(), mailConfig.getStatusFailure());
+    }
+
+    /**
+     * 処理ステータスを未送信に更新する。
+     *
+     * @param data 送信対象データ
+     * @param context 実行コンテキスト
+     */
+    @Published(tag = "architect")
+    protected void updateToUnsent(final SqlRow data, final ExecutionContext context) {
+        MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
+        MailRequestTable.MailRequest mailRequest = mailRequestTable.getMailRequest(data);
+        MailConfig mailConfig = SystemRepository.get("mailConfig");
+
+        mailRequestTable.updateFailureStatus(mailRequest.getMailRequestId(), mailConfig.getStatusUnsent());
     }
 
     /**

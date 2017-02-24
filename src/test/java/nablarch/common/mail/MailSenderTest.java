@@ -444,14 +444,15 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTestOverrideSmtpPort.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int rc = Main.execute(commandLine);
-        assertThat("送信失敗しても処理自体は正常終了する", rc, is(0));
+        assertThat("接続エラー(MessagingException)はリトライ例外を送出するため異常終了", rc, is(20));
 
-        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[4]");
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "nablarch.fw.handler.retry.RetryableException: Failed to send a mail, will be retried to send later. Mail RequestId:[4], Error message:[");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
         assertThat("レコード取得数", mailRequestList.size(), is(1));
-        assertThat("ステータスが「送信失敗」になっているはず", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("ステータスはリトライなので「未送信」", mailRequestList.get(0).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されていないはず", mailRequestList.get(0).sendDatetime, is(nullValue()));
     }
 
@@ -483,14 +484,16 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTestOverrideSmtpConnetcionTimeout.xml",
                 "-requestPath", "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
-        assertThat("送信に失敗しても処理は成功なので0", execute, is(0));
+        assertThat("接続エラー(MessagingException)はリトライ例外を送出するため異常終了", execute, is(20));
 
-        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[5]");
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "nablarch.fw.handler.retry.RetryableException: Failed to send a mail, will be retried to send later. Mail RequestId:[5], Error message:[");
+
 
         // DBの検証（ステータスと送信日時）
         List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
         assertThat("レコード取得数", mailRequestList.size(), is(1));
-        assertThat("ステータスが「送信失敗」になっているはず", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("ステータスがリトライなので「未送信」", mailRequestList.get(0).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されていないはず", mailRequestList.get(0).sendDatetime, is(nullValue()));
     }
 
@@ -521,14 +524,15 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int rc = Main.execute(commandLine);
-        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+        assertThat("MessagingExceptionはリトライ例外を送出するため異常終了", rc, is(20));
 
-        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[6]");
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "nablarch.fw.handler.retry.RetryableException: Failed to send a mail, will be retried to send later. Mail RequestId:[6], Error message:[");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
         assertThat("レコード取得数", mailRequestList.size(), is(1));
-        assertThat("ステータスが「送信失敗」になっているはず", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("ステータスがリトライなので「未送信」", mailRequestList.get(0).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されていないはず", mailRequestList.get(0).sendDatetime, is(nullValue()));
     }
 
@@ -560,14 +564,15 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTestOverrideSmtpTimeout.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int rc = Main.execute(commandLine);
-        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+        assertThat("タイムアウト(MessagingException)はリトライ例外を送出するため異常終了", rc, is(20));
 
-        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[7]");
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "nablarch.fw.handler.retry.RetryableException: Failed to send a mail, will be retried to send later. Mail RequestId:[7], Error message:[");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
         assertThat("レコード取得数", mailRequestList.size(), is(1));
-        assertThat("ステータスが「送信失敗」になっているはず", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("ステータスがリトライなので「未送信」", mailRequestList.get(0).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されていないはず", mailRequestList.get(0).sendDatetime, is(nullValue()));
     }
 
@@ -614,6 +619,12 @@ public class MailSenderTest extends MailTestSupport {
 
         // ----- assert log -----
         //LogVerifier.verify("assert log");
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信失敗」", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時が登録されていないはず", mailRequestList.get(0).sendDatetime, is(nullValue()));
     }
 
     /**
@@ -637,7 +648,6 @@ public class MailSenderTest extends MailTestSupport {
                         mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
 
         VariousDbTestHelper.setUpTable(
-                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1),
                 new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeCC(), cc1 + "\rhoge"));
 
         //LogVerifier.setExpectedLogMessages(new ArrayList<Map<String,String>>() {
@@ -660,6 +670,12 @@ public class MailSenderTest extends MailTestSupport {
 
         // ----- assert log -----
         //LogVerifier.verify("assert log");
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信失敗」", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時が登録されていないはず", mailRequestList.get(0).sendDatetime, is(nullValue()));
     }
 
     /**
@@ -683,7 +699,6 @@ public class MailSenderTest extends MailTestSupport {
                         mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
 
         VariousDbTestHelper.setUpTable(
-                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1),
                 new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeTO(), "hoge\n" + bcc1));
 
         // バッチ実行
@@ -692,6 +707,12 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int execute = Main.execute(commandLine);
         assertThat("送信に失敗しても処理は成功なので0", execute, is(0));
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信失敗」", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時が登録されていないはず", mailRequestList.get(0).sendDatetime, is(nullValue()));
     }
 
     /**
@@ -726,19 +747,23 @@ public class MailSenderTest extends MailTestSupport {
 
         // ----- assert log -----
         OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[1]");
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信失敗」", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時が登録されていないはず", mailRequestList.get(0).sendDatetime, is(nullValue()));
     }
 
     /**
      * {@link Main#execute(CommandLine)}のテスト。
      * <p/>
-     * 処理が異常終了する場合のテスト<br/>
-     * <br/>
-     * 返信先メールアドレスでExceptionが発生するパターン。
+     * 返信先メールアドレスが不正でも送信成功するパターン。
      *
      * @throws Exception
      */
     @Test
-    public void testExecuteAbnormalEndAddressExceptionReplyTo() throws Exception {
+    public void testExecuteAddressExceptionReplyTo() throws Exception {
 
         // データ準備
         String mailRequestId = "1";
@@ -756,9 +781,22 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int rc = Main.execute(commandLine);
-        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+        assertThat("ReplyToの変換に失敗しても、送信の処理は成功なので0", rc, is(0));
 
-        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[1]");
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "Failed to instantiate mail address. Error message:[",
+                "] Mail address:[hoge\nreply@localhost]",
+                "-INFO- メールを送信しました。 mailRequestId=[1]");
+
+        // メールの検証
+        // replyToが不正になるため、replyToはfromになる。
+        assertRecivingPlainMail("to1", from, from, subject, new String[] {to1}, new String[] {});
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信成功」", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
+        assertThat("送信日時が登録される", mailRequestList.get(0).sendDatetime, notNullValue());
 
     }
 
@@ -791,9 +829,16 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
 
         int rc = Main.execute(commandLine);
-        assertThat("処理自体は正常終了となる", rc, is(0));
+        assertThat("MessagingExceptionはリトライ例外を送出するため異常終了", rc, is(20));
 
-        OnMemoryLogWriter.assertLogContains("writer.memory", "-ERROR- メール送信に失敗しました。 mailRequestId=[1]");
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "nablarch.fw.handler.retry.RetryableException: Failed to send a mail, will be retried to send later. Mail RequestId:[1], Error message:[");
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスがリトライなので「未送信」", mailRequestList.get(0).status, is(mailConfig.getStatusUnsent()));
+        assertThat("送信日時が登録されていないはず", mailRequestList.get(0).sendDatetime, is(nullValue()));
     }
 
     /**
@@ -1050,17 +1095,17 @@ public class MailSenderTest extends MailTestSupport {
     }
 
     /**
-     * メールアドレスの文字列が不正で、インスタンス生成に失敗する時のテスト(From)
+     * メールアドレスの文字列(From)が不正で、送信に失敗するテスト
      */
     @Test
-    public void testLoggingAddressExceptionFromAddress() {
+    public void testSendFailAddressExceptionFrom() {
         // データ準備
         String mailRequestId = "1";
-        String subject = "異常系 From アドレスのインスタンス生成失敗";
+        String subject = "From アドレスのインスタンス生成失敗";
 
-        final String invalidAddress = from + "@" + from;
+        final String invalidAddress = from + "@" + from;// returnPathも同時に無効な値にすること。
         VariousDbTestHelper.setUpTable(
-                new MailRequest(mailRequestId, subject, invalidAddress, replyTo, returnPath, charset,
+                new MailRequest(mailRequestId, subject, invalidAddress, replyTo, invalidAddress, charset,
                         mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
         VariousDbTestHelper.setUpTable(
                 new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
@@ -1073,16 +1118,23 @@ public class MailSenderTest extends MailTestSupport {
         assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
 
         OnMemoryLogWriter.assertLogContains("writer.memory", "Failed to instantiate mail address. Error message:[", "] Mail address:[" + invalidAddress +"]");
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信失敗」", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時がnullのまま", mailRequestList.get(0).sendDatetime, nullValue());
     }
 
     /**
-     * メールアドレスの文字列が不正で、インスタンス生成に失敗する時のテスト(ReplyTo)
+     * メールアドレスの文字列(ReplyTo)が不正でも、送信は成功するテスト
+     * @throws Exception メールの検証に失敗したとき
      */
     @Test
-    public void testLoggingAddressExceptionReplyToAddress() {
+    public void testSendSuccessAddressExceptionReplyTo() throws Exception {
         // データ準備
         String mailRequestId = "1";
-        String subject = "異常系 ReplyTo アドレスのインスタンス生成失敗";
+        String subject = "ReplyTo アドレスのインスタンス生成失敗";
         final String invalidAddress = replyTo + "@" + replyTo;
         VariousDbTestHelper.setUpTable(
                 new MailRequest(mailRequestId, subject, from, invalidAddress, returnPath, charset,
@@ -1095,19 +1147,29 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int rc = Main.execute(commandLine);
-        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+        assertThat("ReplyToが不正でも、送信処理は成功なので0", rc, is(0));
 
         OnMemoryLogWriter.assertLogContains("writer.memory", "Failed to instantiate mail address. Error message:[", "] Mail address:[" + invalidAddress +"]");
+
+        // メールの検証
+        assertRecivingPlainMail("to1", from, from, subject, new String[]{to1}, new String[]{});
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信成功」", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
+        assertThat("送信日時が登録されているはず", mailRequestList.get(0).sendDatetime, notNullValue());
     }
 
     /**
-     * メールアドレスの文字列が不正で、インスタンス生成に失敗する時のテスト(To)
+     * メールアドレスの文字列(TO)だけが不正でも、送信は成功するテスト
+     * @throws Exception メールの検証に失敗したとき
      */
     @Test
-    public void testLoggingAddressExceptionSendAddressTO() {
+    public void testSendSuccessAddressExceptionTO() throws Exception {
         // データ準備
         String mailRequestId = "1";
-        String subject = "異常系 送信アドレスのインスタンス生成失敗";
+        String subject = "送信アドレスの不正 TO";
         final String invalidAddress = to1 + "@" + to1;
         VariousDbTestHelper.setUpTable(
                 new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
@@ -1122,19 +1184,30 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int rc = Main.execute(commandLine);
-        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+        assertThat("一部のアドレスが不正でも送信処理は成功なので0", rc, is(0));
 
         OnMemoryLogWriter.assertLogContains("writer.memory", "Failed to instantiate mail address. Error message:[", "] Mail address:[" + invalidAddress +"]");
+
+        // メールの検証
+        assertRecivingPlainMail("cc1", from, replyTo, subject, new String[]{}, new String[]{cc1});// TOなし
+        assertRecivingPlainMail("bcc1", from, replyTo, subject, new String[]{}, new String[]{cc1});// TOなし
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信成功」", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
+        assertThat("送信日時が登録される", mailRequestList.get(0).sendDatetime, notNullValue());
     }
 
     /**
-     * メールアドレスの文字列が不正で、インスタンス生成に失敗する時のテスト(CC)
+     * メールアドレスの文字列(CC)だけが不正でも、送信は成功するテスト
+     * @throws Exception メールの検証に失敗したとき
      */
     @Test
-    public void testLoggingAddressExceptionSendAddressCC() {
+    public void testSendSuccessAddressExceptionCC() throws Exception {
         // データ準備
         String mailRequestId = "1";
-        String subject = "異常系 送信アドレスのインスタンス生成失敗";
+        String subject = "送信アドレスの不正 CC";
         final String invalidAddress = cc1 + "@" + cc1;
         VariousDbTestHelper.setUpTable(
                 new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
@@ -1144,25 +1217,35 @@ public class MailSenderTest extends MailTestSupport {
                 new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeCC(), invalidAddress),
                 new MailRecipient(mailRequestId, 3L, mailConfig.getRecipientTypeBCC(), bcc1));
 
-
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int rc = Main.execute(commandLine);
-        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+        assertThat("一部のアドレスが不正でも送信処理は成功なので0", rc, is(0));
 
         OnMemoryLogWriter.assertLogContains("writer.memory", "Failed to instantiate mail address. Error message:[", "] Mail address:[" + invalidAddress +"]");
+
+        // メールの検証
+        assertRecivingPlainMail("to1", from, replyTo, subject, new String[]{to1}, new String[]{});// CCなし
+        assertRecivingPlainMail("bcc1", from, replyTo, subject, new String[]{to1}, new String[]{});// CCなし
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信成功」", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
+        assertThat("送信日時が登録される", mailRequestList.get(0).sendDatetime, notNullValue());
     }
 
     /**
-     * メールアドレスの文字列が不正で、インスタンス生成に失敗する時のテスト(BCC)
+     * メールアドレスの文字列(BCC)だけが不正でも、送信は成功するテスト
+     * @throws Exception メールの検証に失敗したとき
      */
     @Test
-    public void testLoggingAddressExceptionSendAddressBCC() {
+    public void testSendSuccessAddressExceptionBCC() throws Exception {
         // データ準備
         String mailRequestId = "1";
-        String subject = "異常系 送信アドレスのインスタンス生成失敗";
+        String subject = "送信アドレスの不正 BCC";
         final String invalidAddress = bcc1 + "@" + bcc1;
         VariousDbTestHelper.setUpTable(
                 new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
@@ -1177,16 +1260,135 @@ public class MailSenderTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
         int rc = Main.execute(commandLine);
-        assertThat("送信に失敗しても処理は成功なので0", rc, is(0));
+        assertThat("一部のアドレスが不正でも送信処理は成功なので0", rc, is(0));
 
         OnMemoryLogWriter.assertLogContains("writer.memory", "Failed to instantiate mail address. Error message:[", "] Mail address:[" + invalidAddress +"]");
+
+        // メールの検証
+        assertRecivingPlainMail("to1", from, replyTo, subject, new String[]{to1}, new String[]{cc1});
+        assertRecivingPlainMail("cc1", from, replyTo, subject, new String[]{to1}, new String[]{cc1});
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信成功」", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
+        assertThat("送信日時が登録される", mailRequestList.get(0).sendDatetime, notNullValue());
+    }
+
+    /**
+     * 送信先すべてのメールアドレスの文字列が不正で、送信に失敗するテスト
+     */
+    @Test
+    public void testSendFailAddressExceptionSendAddressNoValid() {
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "送信アドレスの不正 全て";
+        final String invalidAddress1 = to1 + "@" + to1;
+        final String invalidAddress2 = cc1 + "@" + cc1;
+        final String invalidAddress3 = bcc1 + "@" + bcc1;
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), invalidAddress1),
+                new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeCC(), invalidAddress2),
+                new MailRecipient(mailRequestId, 3L, mailConfig.getRecipientTypeBCC(), invalidAddress3));
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("すべてアドレスが不正のため、送信は失敗しても処理は成功なので0", rc, is(0));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "Failed to instantiate mail address. Error message:[",
+                "] Mail address:[" + invalidAddress1 +"]",
+                "] Mail address:[" + invalidAddress2 +"]",
+                "] Mail address:[" + invalidAddress3 +"]");
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信失敗」", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時がnullのまま", mailRequestList.get(0).sendDatetime, nullValue());
+    }
+
+    private void assertRecivingPlainMail(final String account, final String fromAddress, final String replyToAddress, final String mailSubject, final String tos[],
+            final String ccs[]) throws Exception {
+        // accountでメールを受信
+        Session session = Session.getInstance(sessionProperties, new Authenticator() {
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(account, "default");
+            }
+        });
+        Store store = session.getStore("pop3");
+        store.connect();
+        Folder folder = openFolder(store);
+        Message[] messages = folder.getMessages();
+        //メールの削除と取得のタイムラグの間に他のテストケースで送信したメールが複数届く場合があるため、
+        //Subjectが一致するものを処理対象とする。
+        Message message = null;
+        for (Message mail: messages ) {
+            if( mailSubject.equals(mail.getSubject()) ) {
+                message = mail;
+                break;
+            }
+        }
+        assertThat("件名[" + mailSubject + "]が一致するメールが届いていない", message, notNullValue());
+
+        // メールの検証
+        // FROM
+        Address[] messageFrom = message.getFrom();
+        assertThat("fromアドレスの数", messageFrom.length, is(1));
+        assertThat("fromアドレス", ((InternetAddress) messageFrom[0]).getAddress(), is(fromAddress));
+        // TO
+        Address[] messageTO = message.getRecipients(RecipientType.TO);
+        if (messageTO == null) {
+            assertThat( "TOがnullなのでtos[]は空のはず", tos.length, is(0));
+        } else {
+            assertThat("TOアドレスの数", messageTO.length, is(tos.length));
+        }
+        for (int i=0; i<tos.length; i++) {
+            final String to = tos[i];
+            assertThat("TOアドレス" + (i+1), ((InternetAddress) messageTO[i]).getAddress(), is(to));
+        }
+        // CC
+        Address[] messageCC = message.getRecipients(RecipientType.CC);
+        if (messageCC == null) {
+            assertThat( "CCがnullなのでccs[]は空のはず", ccs.length, is(0));
+        } else {
+            assertThat("CCアドレスの数", messageCC.length, is(ccs.length));
+        }
+        for (int i=0; i<ccs.length; i++) {
+            final String cc = ccs[i];
+            assertThat("CCアドレス" + (i+1), ((InternetAddress) messageCC[i]).getAddress(), is(cc));
+        }
+        // BCCは検証できない
+
+        // ReplyTo
+        Address[] messageReplyTo = message.getReplyTo();
+        assertThat("ReplyToの数", messageReplyTo.length, is(1));
+        assertThat("ReplyToアドレス", ((InternetAddress) messageReplyTo[0]).getAddress(), is(replyToAddress));
+        // Return-Path
+        String[] messageReturnPath = message.getHeader("Return-Path");
+        assertThat("RetrunPathの数", messageReturnPath.length, is(1));
+        assertThat("RetrunPathアドレス", messageReturnPath[0], is("<" + returnPath + ">"));
+        // Subject
+        String messageSubject = message.getSubject();
+        assertThat("件名", messageSubject, is(mailSubject));
+        // Content-Type
+        assertThat("Content-Type", message.getContentType(), containsString("text/plain"));
+        // Body
+        assertThat("添付ファイルなしなので", message.getContent(), is(instanceOf(String.class)));
+        assertThat("本文", (String) message.getContent(), is(mailBody));
     }
 
     /**
      * メール送信の実行時に{@link SendFailedException}が発生した場合の詳細ログがERRORに出力されていることのテスト
      */
     @Test
-    public void testLoggingSendFailedException() {
+    public void testSendFailBySendFailedException() {
 
         new MockUp<Transport>() {
 
@@ -1230,6 +1432,12 @@ public class MailSenderTest extends MailTestSupport {
                         + "Sent address:[to1@localhost, to2@localhost, cc1@localhost] "
                         + "Unsent address:[to3@localhost] "
                         + "Invalid address:[]");
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信失敗」", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時がnullのまま", mailRequestList.get(0).sendDatetime, nullValue());
     }
 
     /**
@@ -1237,7 +1445,7 @@ public class MailSenderTest extends MailTestSupport {
      * (例外から取得されるアドレスがnullの場合)
      */
     @Test
-    public void testLoggingSendFailedExceptionAddressesNull() {
+    public void testSendFailedBySendFailedExceptionAddressesNull() {
 
         new MockUp<Transport>() {
 
@@ -1281,5 +1489,150 @@ public class MailSenderTest extends MailTestSupport {
                         + "Sent address:[] "
                         + "Unsent address:[] "
                         + "Invalid address:[]");
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信失敗」", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時がnullのまま", mailRequestList.get(0).sendDatetime, nullValue());
     }
+
+    /**
+     * メール送信の実行時に{@link SendFailedException}が発生し、リトライ例外を送出しなかった場合で、
+     * {@link nablarch.fw.launcher.ProcessAbnormalEnd}を返す前に「未送信」ステータスへの変更に失敗するテスト
+     */
+    @Test
+    public void testRetryableExceptionAndStatusUpdateFail() {
+
+        new MockUp<MailRequestTable>() {
+            @Mock
+            void updateFailureStatus(final String mailRequestId, final String status) {
+                throw new DbAccessException("db error!!!!", new SQLException());
+            }
+        };
+
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "異常系 リトライ例外送出後にDB更新失敗";
+
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath, "aaaa", mailConfig.getStatusUnsent(),
+                        SystemTimeUtil.getTimestamp(), null, mailBody));
+
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("送信失敗ステータスへの更新失敗なので異常終了する", rc, is(20));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "failed to update unsent status. need to apply a patch to change the status to unsent. target data=[mailRequestId = 1]");
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスは更新に失敗するので「送信済み」のまま", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
+        assertThat("送信日時が登録されていないはず", mailRequestList.get(0).sendDatetime, notNullValue());
+    }
+
+    /**
+     * メール送信の実行時に{@link SendFailedException}が発生し、リトライ例外を送出しなかった場合に
+     * {@link nablarch.fw.launcher.ProcessAbnormalEnd}となるテスト
+     */
+    @Test
+    public void testNoRetryableExceptionAndProcessAbnormalEnd() {
+
+        new MockUp<Transport>() {
+
+            @Mock
+            public void send(Message message) throws MessagingException {
+                throw new MessagingException("Test MessagingException message.");
+            }
+        };
+
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "異常系 Transport.Sendで失敗（リトライしない）";
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1),
+                new MailRecipient(mailRequestId, 2L, mailConfig.getRecipientTypeTO(), to2),
+                new MailRecipient(mailRequestId, 3L, mailConfig.getRecipientTypeTO(), to3),
+                new MailRecipient(mailRequestId, 4L, mailConfig.getRecipientTypeTO(), cc1));
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.NoRetryMailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("リトライ例外を送出しないため、送信に失敗しても処理は成功なので0", rc, is(0));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "javax.mail.MessagingException: Test MessagingException message.",
+                "-ERROR- メール送信に失敗しました。 mailRequestId=[1]",
+                "-ERROR- fail_code = [SEND_FAIL0] メール送信に失敗しました。 mailRequestId=[1]"  // 障害検知ログ
+        );
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスが「送信失敗」", mailRequestList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時がnullのまま", mailRequestList.get(0).sendDatetime, nullValue());
+    }
+
+    /**
+     * メール送信の実行時に{@link SendFailedException}が発生し、リトライ例外を送出しなかった場合で、
+     * {@link nablarch.fw.launcher.ProcessAbnormalEnd}を返す前に「未送信」ステータスへの変更に失敗するテスト
+     */
+    @Test
+    public void testNoRetryableExceptionAndStatusUpdateFail() {
+
+        new MockUp<Transport>() {
+
+            @Mock
+            public void send(Message message) throws MessagingException {
+                throw new MessagingException("Test MessagingException message.");
+            }
+        };
+
+        new MockUp<MailRequestTable>() {
+            @Mock
+            void updateFailureStatus(final String mailRequestId, final String status) {
+                throw new DbAccessException("db error!!!!", new SQLException());
+            }
+        };
+
+        // データ準備
+        String mailRequestId = "1";
+        String subject = "異常系 Transport.Sendで失敗後にDB更新失敗";
+        VariousDbTestHelper.setUpTable(
+                new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+        VariousDbTestHelper.setUpTable(
+                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
+
+        // バッチ実行
+        CommandLine commandLine = new CommandLine("-diConfig",
+                "nablarch/common/mail/MailSenderTest.xml", "-requestPath",
+                "nablarch.common.mail.NoRetryMailSender/SENDMAIL00", "-userId", "hoge");
+        int rc = Main.execute(commandLine);
+        assertThat("送信失敗ステータスへの更新失敗なので異常終了する", rc, is(20));
+
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "failed to update unsent status. need to apply a patch to change the status to unsent. target data=[mailRequestId = 1]"
+        );
+
+        // DBの検証（ステータスと送信日時）
+        List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
+        assertThat("レコード取得数", mailRequestList.size(), is(1));
+        assertThat("ステータスは更新に失敗するので「送信済み」のまま", mailRequestList.get(0).status, is(mailConfig.getStatusSent()));
+        assertThat("送信日時が登録されていないはず", mailRequestList.get(0).sendDatetime, notNullValue());
+    }
+
 }
