@@ -27,19 +27,21 @@ import javax.mail.internet.MimeMessage.RecipientType;
 
 import nablarch.core.date.SystemTimeUtil;
 import nablarch.core.util.FileUtil;
-import nablarch.fw.ExecutionContext;
-import nablarch.fw.Handler;
 import nablarch.fw.launcher.CommandLine;
 import nablarch.fw.launcher.Main;
 import nablarch.test.support.SystemRepositoryResource;
 import nablarch.test.support.db.helper.DatabaseTestRunner;
 import nablarch.test.support.db.helper.VariousDbTestHelper;
+import nablarch.test.support.log.app.OnMemoryLogWriter;
 
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import mockit.Mock;
+import mockit.MockUp;
 
 /**
  * {@link nablarch.common.mail.MailSender}のテストクラス。
@@ -72,6 +74,7 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
                 new MailTestMessage("REQ_COUNT0", "en", "{0} records of mail request selected."));
 
         VariousDbTestHelper.setUpTable(new MailBatchRequest("SENDMAIL00", "メール送信バッチ", "0", "0", "1"));
+        OnMemoryLogWriter.clear();
     }
 
     @AfterClass
@@ -468,16 +471,21 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderPatternIdSupportTestPortError.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge", "-mailSendPatternId", "00");
-        int execute;
-        execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        int rc = Main.execute(commandLine);
+        assertThat("接続エラー(MessagingException)はリトライ例外で、上限を超えて異常終了し戻り値は180になる。", rc, is(180));
 
-        assertError(MailTestErrorHandler.catched, mailRequestId, mailConfig.getAbnormalEndExitCode());
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "メール送信要求が 1 件あります。",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[4], error message=[",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[1]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[2]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[3]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] retry process failed. retry limit was exceeded.");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class);
         assertThat("レコード取得数", mailRequestPatternList.size(), is(1));
-        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("ステータスが「未送信」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(0).sendDatetime, is(nullValue()));
     }
 
@@ -509,15 +517,21 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
                 "nablarch/common/mail/MailSenderPatternIdSupportTestConnectionTimeout.xml",
                 "-requestPath", "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge", "-mailSendPatternId",
                 "AB");
-        int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        int rc = Main.execute(commandLine);
+        assertThat("タイムアウト(MessagingException)はリトライ例外で、上限を超えて異常終了し戻り値は180になる。", rc, is(180));
 
-        assertError(MailTestErrorHandler.catched, mailRequestId, mailConfig.getAbnormalEndExitCode());
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "メール送信要求が 1 件あります。",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[5], error message=[",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[1]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[2]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[3]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] retry process failed. retry limit was exceeded.");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class);
         assertThat("レコード取得数", mailRequestPatternList.size(), is(1));
-        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("ステータスが「未送信」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(0).sendDatetime, is(nullValue()));
 
     }
@@ -546,17 +560,23 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
-                "nablarch/common/mail/MailSenderPatternIdSupportTest.xml", "-requestPath",
+                "nablarch/common/mail/MailSenderPatternIdSupportTestRetry.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge", "-mailSendPatternId", "QQ");
-        int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        int rc = Main.execute(commandLine);
+        assertThat("接続エラー(MessagingException)はリトライ例外で、上限を超えて異常終了し戻り値は180になる。", rc, is(180));
 
-        assertError(MailTestErrorHandler.catched, mailRequestId, mailConfig.getAbnormalEndExitCode());
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "メール送信要求が 1 件あります。",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[6], error message=[",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[1]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[2]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[3]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] retry process failed. retry limit was exceeded.");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class);
         assertThat("レコード取得数", mailRequestPatternList.size(), is(1));
-        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("ステータスが「未送信」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(0).sendDatetime, is(nullValue()));
 
     }
@@ -588,31 +608,21 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
         CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderPatternIdSupportTestSendTimeout.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge", "-mailSendPatternId", "hg");
-        int execute = Main.execute(commandLine);
-        assertThat("異常終了なので戻り値は199となる。", execute, is(mailConfig.getAbnormalEndExitCode()));
+        int rc = Main.execute(commandLine);
+        assertThat("タイムアウト(MessagingException)はリトライ例外で、上限を超えて異常終了し戻り値は180になる。", rc, is(180));
 
-        assertError(MailTestErrorHandler.catched, mailRequestId, mailConfig.getAbnormalEndExitCode());
+        OnMemoryLogWriter.assertLogContains("writer.memory",
+                "メール送信要求が 1 件あります。",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[7], error message=[",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[1]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[2]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[3]",
+                "req_id = [SENDMAIL00] usr_id = [hoge] retry process failed. retry limit was exceeded.");
 
         // DBの検証（ステータスと送信日時）
         List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class);
         assertThat("レコード取得数", mailRequestPatternList.size(), is(1));
-        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusFailure()));
+        assertThat("ステータスが「未送信」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(0).sendDatetime, is(nullValue()));
-    }
-
-    public static class MailTestErrorHandler implements Handler<Object, Object> {
-
-        protected static Exception catched;
-
-        /** {@inheritDoc} */
-        public Object handle(Object req, ExecutionContext ctx) {
-
-            try {
-                return ctx.handleNext(req);
-            } catch (RuntimeException e) {
-                catched = e;
-                throw e;
-            }
-        }
     }
 }

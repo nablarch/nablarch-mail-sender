@@ -33,7 +33,14 @@
         <property name="interval" value="500" />
     </component>
 
-    <!-- ハンドラキュー構成 -->
+  <!-- ステータス更新用のトランザクション -->
+    <component name="statusUpdateTransaction" class="nablarch.core.db.transaction.SimpleDbTransactionManager">
+        <property name="dbTransactionName" value="statusUpdateTransaction" />
+        <property name="connectionFactory" ref="connectionFactory" />
+        <property name="transactionFactory" ref="jdbcTransactionFactory" />
+    </component>
+
+  <!-- ハンドラキュー構成 -->
     <list name="handlerQueue">
         <!-- ステータスコードを終了コードに変換するハンドラ -->
         <component class="nablarch.fw.handler.StatusCodeConvertHandler" />

@@ -189,6 +189,7 @@ public class MailAttachedFileTable implements Initializable {
      *
      * @author hisaaki shioiri
      */
+    @Published(tag = "architect")
     public static class MailAttachedFile {
 
         /** 添付ファイル管理の1レコード分の情報を保持するオブジェクト */
