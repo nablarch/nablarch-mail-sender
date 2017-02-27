@@ -21,10 +21,10 @@
     <import file="nablarch/common/mail/handler/residentProcessStop.xml" />
 
     <import file="nablarch/common/mail/message.xml" />
-    
+
     <!-- リクエストID抽出の実装 -->
     <component name="requestIdExtractor" class="nablarch.common.util.ShortRequestIdExtractor" />
-    
+
     <!--コミットログ実装 -->
     <component name="commitLogger" class="nablarch.core.log.app.BasicCommitLogger">
         <property name="interval" value="500" />
@@ -44,8 +44,20 @@
         <component class="nablarch.fw.handler.GlobalErrorHandler" />
         <!-- スレッドコンテキスト設定ハンドラ -->
         <component-ref name="threadContextHandler" />
-        <!-- 常駐化ハンドラ （テスト時は戻ってこさせるためにはずす） -->
-        <!--<component-ref name="processResidentHandler" /> -->
+
+        <!-- リトライハンドラ -->
+        <component name="retryHandler" class="nablarch.fw.handler.RetryHandler">
+          <property name="retryLimitExceededFailureCode" value="" />
+          <property name="retryContextFactory">
+            <component class="nablarch.fw.handler.retry.CountingRetryContextFactory">
+              <property name="retryCount" value="1" />          <!-- 1回リトライを行う -->
+              <property name="retryIntervals" value="500" />   <!-- リトライを実行するまで0.5秒待機する -->
+            </component>
+          </property>
+        </component>
+
+        <!-- 常駐化ハンドラ (Retryも含めてテストする) -->
+        <component-ref name="processResidentHandler" />
         <!--処理停止ハンドラ -->
         <component-ref name="processStopHandler" />
         <!-- データベース接続ハンドラ -->

@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.mail.Authenticator;
 import javax.mail.Flags;
@@ -162,6 +164,33 @@ public class MailTestSupport {
         assertThat("ログが出力されていること", writeLog, is(true));
     }
 
+    public void assertLogWithCount(String categoryName, String messagePattern, int expectedCount)
+    {
+        List<String> log = OnMemoryLogWriter.getMessages(categoryName);
+        System.out.println("log = " + log);
+        String msg = messagePattern.replaceAll("\\r|\\n", "");
+        Pattern pattern = Pattern.compile(msg);
+        int logCount = 0;
+        for (String logMessage : log) {
+            String str = logMessage.replaceAll("\\r|\\n", "");
+            Matcher matcher = pattern.matcher(str);
+            if (matcher.matches()) {
+                logCount++;
+            }
+        }
+        assertThat( String.format("障害通知ログが指定回数だけ出力されていること messagePattern=[%s]",messagePattern), logCount, is(expectedCount));
+    }
+
+    public String createMessagePattern(final String... args) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(".*");
+        for (String arg: args) {
+            sb.append(Pattern.quote(arg));
+            sb.append(".*");
+        }
+        return sb.toString();
+    }
+
     public byte[] convertToByteArray(InputStream is) throws IOException {
         BufferedInputStream bis = new BufferedInputStream(is);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -187,6 +216,28 @@ public class MailTestSupport {
             folder.open(Folder.READ_WRITE);
             if (folder.getMessageCount() > 0) {
                 break;
+            }
+            folder.close(true);
+        }
+        return folder;
+    }
+
+    public Folder openFolder(Store store, String expectedSubject) throws Exception {
+        Folder folder = null;
+        for (int i = 0; i < 20; i++) {
+            // ちょっと待つ...
+            Thread.sleep(waitTime);
+            store.close();
+            store.connect();
+            folder = store.getFolder("INBOX");
+            folder.open(Folder.READ_WRITE);
+            if (folder.getMessageCount() > 0) {
+                Message[] messages = folder.getMessages();
+                for (Message message : messages) {
+                    if (expectedSubject.equals(message.getSubject())) {
+                        return folder;
+                    }
+                }
             }
             folder.close(true);
         }

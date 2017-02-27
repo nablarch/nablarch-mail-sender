@@ -4,7 +4,7 @@
     xsi:schemaLocation="http://tis.co.jp/nablarch/component-configuration">
 
   <!-- 正常系の設定ファイルをインポート -->
-  <import file="nablarch/common/mail/MailSenderPatternIdSupportTest.xml" />
+  <import file="nablarch/common/mail/MailSenderPatternIdSupportTestRetry.xml" />
 
   <component name="mailSessionConfig" class="nablarch.common.mail.MailSessionConfig">
     <property name="mailSmtpHost" value="${mail.smtp.host}" />
