@@ -50,7 +50,7 @@
           <property name="retryLimitExceededFailureCode" value="" />
           <property name="retryContextFactory">
             <component class="nablarch.fw.handler.retry.CountingRetryContextFactory">
-              <property name="retryCount" value="3" />          <!-- 3回リトライを行う -->
+              <property name="retryCount" value="1" />          <!-- 1回リトライを行う -->
               <property name="retryIntervals" value="500" />   <!-- リトライを実行するまで0.5秒待機する -->
             </component>
           </property>
