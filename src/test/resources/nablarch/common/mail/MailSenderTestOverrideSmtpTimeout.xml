@@ -4,7 +4,7 @@
     xsi:schemaLocation="http://tis.co.jp/nablarch/component-configuration">
 
     <!-- 正常系の設定ファイルをインポート -->
-    <import file="nablarch/common/mail/MailSenderTest.xml" />
+    <import file="nablarch/common/mail/MailSenderTestRetry.xml" />
 
     <!-- 接続エラーを発生させるためにポート番号をオーバーライド -->
     <component name="mailSessionConfig" class="nablarch.common.mail.MailSessionConfig">
