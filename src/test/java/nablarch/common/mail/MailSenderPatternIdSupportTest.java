@@ -457,15 +457,20 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
     public void testExecuteAbnormalEndConnectionRefused() throws SQLException {
 
         // データ準備
-        String mailRequestId = "4";
-        String subject = "異常系1(接続エラー)";
+        String mailRequestId1 = "4-1";
+        String subject1 = "異常系1-1(接続エラー)";
+        String mailRequestId2 = "4-2";
+        String subject2 = "異常系1-2(接続エラー)";
 
         VariousDbTestHelper.setUpTable(
-                new MailRequestPattern(mailRequestId, subject, from, replyTo, returnPath, charset,
+                new MailRequestPattern(mailRequestId1, subject1, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, "00"),
+                new MailRequestPattern(mailRequestId2, subject2, from, replyTo, returnPath, charset,
                         mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, "00"));
 
         VariousDbTestHelper.setUpTable(
-                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
+                new MailRecipient(mailRequestId1, 1L, mailConfig.getRecipientTypeTO(), to1),
+                new MailRecipient(mailRequestId2, 2L, mailConfig.getRecipientTypeTO(), to1));
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
@@ -475,18 +480,19 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
         assertThat("接続エラー(MessagingException)はリトライ例外で、上限を超えて異常終了し戻り値は180になる。", rc, is(180));
 
         OnMemoryLogWriter.assertLogContains("writer.memory",
-                "メール送信要求が 1 件あります。",
-                "Failed to send a mail, will be retried to send later. mailRequestId=[4], error message=[",
+                "メール送信要求が 2 件あります。",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[4-1], error message=[",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[4-2], error message=[",
                 "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[1]",
-                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[2]",
-                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[3]",
                 "req_id = [SENDMAIL00] usr_id = [hoge] retry process failed. retry limit was exceeded.");
 
         // DBの検証（ステータスと送信日時）
-        List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class);
-        assertThat("レコード取得数", mailRequestPatternList.size(), is(1));
-        assertThat("ステータスが「未送信」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusUnsent()));
+        List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class, "mailRequestId");
+        assertThat("レコード取得数", mailRequestPatternList.size(), is(2));
+        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusFailure()));
         assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(0).sendDatetime, is(nullValue()));
+        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(1).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(1).sendDatetime, is(nullValue()));
     }
 
     /**
@@ -502,15 +508,20 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
     public void testExecuteAbnormalEndConnectionTimeout() throws SQLException {
 
         // データ準備
-        String mailRequestId = "5";
-        String subject = "異常系2（接続タイムアウト）";
+        String mailRequestId1 = "5-1";
+        String subject1 = "異常系2-1（接続タイムアウト）";
+        String mailRequestId2 = "5-2";
+        String subject2 = "異常系2-2（接続タイムアウト）";
 
         VariousDbTestHelper.setUpTable(
-                new MailRequestPattern(mailRequestId, subject, from, replyTo, returnPath, charset,
+                new MailRequestPattern(mailRequestId1, subject1, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, "AB"),
+                new MailRequestPattern(mailRequestId2, subject2, from, replyTo, returnPath, charset,
                         mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, "AB"));
 
         VariousDbTestHelper.setUpTable(
-                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
+                new MailRecipient(mailRequestId1, 1L, mailConfig.getRecipientTypeTO(), to1),
+                new MailRecipient(mailRequestId2, 2L, mailConfig.getRecipientTypeTO(), to1));
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
@@ -521,18 +532,19 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
         assertThat("タイムアウト(MessagingException)はリトライ例外で、上限を超えて異常終了し戻り値は180になる。", rc, is(180));
 
         OnMemoryLogWriter.assertLogContains("writer.memory",
-                "メール送信要求が 1 件あります。",
-                "Failed to send a mail, will be retried to send later. mailRequestId=[5], error message=[",
+                "メール送信要求が 2 件あります。",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[5-1], error message=[",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[5-2], error message=[",
                 "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[1]",
-                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[2]",
-                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[3]",
                 "req_id = [SENDMAIL00] usr_id = [hoge] retry process failed. retry limit was exceeded.");
 
         // DBの検証（ステータスと送信日時）
-        List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class);
-        assertThat("レコード取得数", mailRequestPatternList.size(), is(1));
-        assertThat("ステータスが「未送信」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusUnsent()));
+        List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class, "mailRequestId");
+        assertThat("レコード取得数", mailRequestPatternList.size(), is(2));
+        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusFailure()));
         assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(0).sendDatetime, is(nullValue()));
+        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(1).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(1).sendDatetime, is(nullValue()));
 
     }
 
@@ -548,15 +560,20 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
     @Test
     public void testExecuteAbnormalEndSendError() throws SQLException {
         // データ準備
-        String mailRequestId = "6";
-        String subject = "異常系4(送信エラー）";
+        String mailRequestId1 = "6-1";
+        String subject1 = "異常系3-1(送信エラー）";
+        String mailRequestId2 = "6-2";
+        String subject2 = "異常系3-2(送信エラー）";
 
         VariousDbTestHelper.setUpTable(
-                new MailRequestPattern(mailRequestId, subject, from, replyTo, returnPath, "aaaa",
+                new MailRequestPattern(mailRequestId1, subject1, from, replyTo, returnPath, "aaaa",
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, "QQ"),
+                new MailRequestPattern(mailRequestId2, subject2, from, replyTo, returnPath, "aaaa",
                         mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, "QQ"));
 
         VariousDbTestHelper.setUpTable(
-                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
+                new MailRecipient(mailRequestId1, 1L, mailConfig.getRecipientTypeTO(), to1),
+                new MailRecipient(mailRequestId2, 2L, mailConfig.getRecipientTypeTO(), to1));
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
@@ -566,18 +583,19 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
         assertThat("接続エラー(MessagingException)はリトライ例外で、上限を超えて異常終了し戻り値は180になる。", rc, is(180));
 
         OnMemoryLogWriter.assertLogContains("writer.memory",
-                "メール送信要求が 1 件あります。",
-                "Failed to send a mail, will be retried to send later. mailRequestId=[6], error message=[",
+                "メール送信要求が 2 件あります。",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[6-1], error message=[",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[6-2], error message=[",
                 "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[1]",
-                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[2]",
-                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[3]",
                 "req_id = [SENDMAIL00] usr_id = [hoge] retry process failed. retry limit was exceeded.");
 
         // DBの検証（ステータスと送信日時）
-        List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class);
-        assertThat("レコード取得数", mailRequestPatternList.size(), is(1));
-        assertThat("ステータスが「未送信」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusUnsent()));
+        List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class, "mailRequestId");
+        assertThat("レコード取得数", mailRequestPatternList.size(), is(2));
+        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusFailure()));
         assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(0).sendDatetime, is(nullValue()));
+        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(1).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(1).sendDatetime, is(nullValue()));
 
     }
 
@@ -594,15 +612,20 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
     public void testExecuteAbnormalEndSendTimeout() throws Exception {
 
         // データ準備
-        String mailRequestId = "7";
-        String subject = "異常系4(送信タイムアウト）";
+        String mailRequestId1 = "7-1";
+        String subject1 = "異常系4-1(送信タイムアウト）";
+        String mailRequestId2 = "7-2";
+        String subject2 = "異常系4-2(送信タイムアウト）";
 
         VariousDbTestHelper.setUpTable(
-                new MailRequestPattern(mailRequestId, subject, from, replyTo, returnPath, charset,
+                new MailRequestPattern(mailRequestId1, subject1, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, "hg"),
+                new MailRequestPattern(mailRequestId2, subject2, from, replyTo, returnPath, charset,
                         mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, "hg"));
 
         VariousDbTestHelper.setUpTable(
-                new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeTO(), to1));
+                new MailRecipient(mailRequestId1, 1L, mailConfig.getRecipientTypeTO(), to1),
+                new MailRecipient(mailRequestId2, 2L, mailConfig.getRecipientTypeTO(), to1));
 
         // バッチ実行
         CommandLine commandLine = new CommandLine("-diConfig",
@@ -612,17 +635,18 @@ public class MailSenderPatternIdSupportTest extends MailTestSupport {
         assertThat("タイムアウト(MessagingException)はリトライ例外で、上限を超えて異常終了し戻り値は180になる。", rc, is(180));
 
         OnMemoryLogWriter.assertLogContains("writer.memory",
-                "メール送信要求が 1 件あります。",
-                "Failed to send a mail, will be retried to send later. mailRequestId=[7], error message=[",
+                "メール送信要求が 2 件あります。",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[7-1], error message=[",
+                "Failed to send a mail, will be retried to send later. mailRequestId=[7-2], error message=[",
                 "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[1]",
-                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[2]",
-                "req_id = [SENDMAIL00] usr_id = [hoge] caught a exception to retry. start retry. retryCount[3]",
                 "req_id = [SENDMAIL00] usr_id = [hoge] retry process failed. retry limit was exceeded.");
 
         // DBの検証（ステータスと送信日時）
-        List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class);
-        assertThat("レコード取得数", mailRequestPatternList.size(), is(1));
-        assertThat("ステータスが「未送信」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusUnsent()));
+        List<MailRequestPattern> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPattern.class, "mailRequestId");
+        assertThat("レコード取得数", mailRequestPatternList.size(), is(2));
+        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusFailure()));
         assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(0).sendDatetime, is(nullValue()));
+        assertThat("ステータスが「送信失敗」になっているはず", mailRequestPatternList.get(1).status, is(mailConfig.getStatusFailure()));
+        assertThat("送信日時が登録されていないはず", mailRequestPatternList.get(1).sendDatetime, is(nullValue()));
     }
 }
