@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import nablarch.common.idgenerator.IdGenerator;
+import nablarch.core.db.transaction.SimpleDbTransactionManager;
 import nablarch.core.util.StringUtil;
 import nablarch.core.util.annotation.Published;
 
@@ -49,6 +50,9 @@ public class MailRequester {
 
     /** メールテンプレート管理テーブルのスキーマ情報 */
     private MailTemplateTable mailTemplateTable;
+
+    /** メール送信時のDB登録に利用するトランザクションマネージャ */
+    private SimpleDbTransactionManager mailTransactionManager;
 
     /**
      * 非定型メールの送信要求を行う。
@@ -119,6 +123,28 @@ public class MailRequester {
             ctx.setCharset(mailRequestConfig.getDefaultCharset());
         }
 
+        String mailRequestId = null;
+        if (mailTransactionManager != null) {
+            try {
+                mailTransactionManager.beginTransaction();
+                mailRequestId = setupMail(ctx);
+            } finally {
+                mailTransactionManager.commitTransaction();
+                mailTransactionManager.endTransaction();
+            }
+        } else {
+            mailRequestId = setupMail(ctx);
+        }
+        return mailRequestId;
+    }
+
+    /**
+     * メール送信要求IDの採番、送信DBへの登録処理
+     *
+     * @param ctx メール送信要求
+     * @return メール送信要求ID
+     */
+    private String setupMail(MailContext ctx) {
         // メール送信要求ID採番
         String mailRequestId = mailRequestIdGenerator.generateId(mailConfig
                 .getMailRequestSbnId());
@@ -127,7 +153,6 @@ public class MailRequester {
         mailRequestTable.insert(mailRequestId, ctx);
         mailRecipientTable.insert(mailRequestId, ctx, mailConfig);
         mailAttachedFileTable.insert(mailRequestId, ctx);
-
         return mailRequestId;
     }
 
@@ -222,5 +247,15 @@ public class MailRequester {
      */
     public void setMailTemplateTable(MailTemplateTable mailTemplateTable) {
         this.mailTemplateTable = mailTemplateTable;
+    }
+
+    /**
+     * メール送信時に利用するトランザクションマネージャを設定する。
+     *
+     * @param mailTransactionManager
+     *             トランザクションマネージャ
+     */
+    public void setMailTransactionManager(SimpleDbTransactionManager mailTransactionManager) {
+        this.mailTransactionManager = mailTransactionManager;
     }
 }

@@ -14,7 +14,16 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 
+import mockit.Mocked;
+import mockit.Verifications;
+import nablarch.core.db.connection.ConnectionFactory;
+import nablarch.core.db.connection.DbConnectionContext;
+import nablarch.core.db.connection.TransactionManagerConnection;
 import nablarch.core.db.transaction.SimpleDbTransactionManager;
+import nablarch.core.repository.SystemRepository;
+import nablarch.core.repository.di.DiContainer;
+import nablarch.core.repository.di.config.xml.XmlComponentDefinitionLoader;
+import nablarch.core.transaction.TransactionContext;
 import nablarch.core.util.FileUtil;
 import nablarch.core.util.annotation.Published;
 import nablarch.test.support.SystemRepositoryResource;
@@ -859,6 +868,180 @@ public class MailRequesterTest extends MailTestSupport {
 
         } catch (IllegalArgumentException e) {
             assertThat(e.getMessage(), is("replace key must not be null"));
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /**
+     * {@link MailRequester}にトランザクションマネージャを設定した時のテスト。
+     * beginTransaction, commitTransaction, beginTransactionが呼ばれることを確認する。
+     *
+     */
+    @Test
+    public void testSpecifiedMockedTransactionManager(@Mocked final SimpleDbTransactionManager mockedSimpleDbTransactionManager) throws Exception {
+        final ConnectionFactory connectionFactory = repositoryResource.getComponentByType(
+                ConnectionFactory.class);
+        final TransactionManagerConnection connection = connectionFactory.getConnection(
+                TransactionContext.DEFAULT_TRANSACTION_CONTEXT_KEY);
+        DbConnectionContext.setConnection(connection);
+
+        MailRequester requester = MailUtil.getMailRequester();
+        requester.setMailTransactionManager(mockedSimpleDbTransactionManager);
+
+        FreeTextMailContext ctx = new FreeTextMailContext();
+        ctx.setFrom(from);
+        ctx.addCc(cc1);
+        ctx.addCc(cc2);
+        ctx.addCc(cc3);
+        ctx.addBcc(bcc1);
+        ctx.setReturnPath(returnPath);
+        ctx.setReplyTo(replyTo);
+        ctx.setSubject(subject);
+        ctx.setMailBody(mailBody);
+        ctx.setCharset(charset);
+
+        // 送信要求
+        requester.requestToSend(ctx);
+
+        new Verifications () {{
+           mockedSimpleDbTransactionManager.beginTransaction();
+           times=1;
+           mockedSimpleDbTransactionManager.commitTransaction();
+           times=1;
+           mockedSimpleDbTransactionManager.endTransaction();
+           times=1;
+        }};
+    }
+
+    /**
+     * 設定ファイルで、{@link MailRequester}にトランザクションマネージャを設定した時のテスト。
+     * データ登録が正常に行なわれることを確認する。
+     *
+     */
+    @Test
+    public void testSpecifiedOtherTxOnConfigurationFile() throws Exception {
+        SystemRepository.clear();
+        SystemRepository.load(new DiContainer(new XmlComponentDefinitionLoader("nablarch/common/mail/MailRequesterTestOtherTransaction.xml")));
+
+        MailRequester requester = MailUtil.getMailRequester();
+
+        FreeTextMailContext ctx = new FreeTextMailContext();
+        ctx.setFrom(from);
+        ctx.addCc(cc1);
+        ctx.addCc(cc2);
+        ctx.addCc(cc3);
+        ctx.addBcc(bcc1);
+        ctx.setReturnPath(returnPath);
+        ctx.setReplyTo(replyTo);
+        ctx.setSubject(subject);
+        ctx.setMailBody(mailBody);
+        ctx.setCharset(charset);
+
+        // 送信要求
+        String mailRequestId = requester.requestToSend(ctx);
+
+        // メール送信要求管理テーブルの確認
+        MailRequest mailRequest = VariousDbTestHelper.findById(MailRequest.class, mailRequestId);
+        assertThat(mailRequest, is(notNullValue()));
+        assertThat(mailRequest.subject, is(subject));
+        assertThat(mailRequest.mailFrom, is(from));
+        assertThat(mailRequest.replyTo, is(replyTo));
+        assertThat(mailRequest.returnPath, is(returnPath));
+        assertThat(mailRequest.charset, is(charset));
+        assertThat(mailRequest.status, is(mailConfig.getStatusUnsent()));
+        assertThat(mailRequest.mailBody, is(mailBody));
+
+        List<MailRecipient> mailRecipientList = VariousDbTestHelper.findAll(MailRecipient.class, "mailRequestId",
+                "serialNumber");
+        assertThat(mailRecipientList.size(), is(4));
+
+        assertThat(mailRecipientList.get(0).mailRequestId, is(mailRequestId));
+        assertThat(mailRecipientList.get(0).serialNumber, is(1L));
+        assertThat(mailRecipientList.get(0).recipientType, is(mailConfig.getRecipientTypeCC()));
+        assertThat(mailRecipientList.get(0).mailAddress, is(cc1));
+        assertThat(mailRecipientList.get(1).mailRequestId, is(mailRequestId));
+        assertThat(mailRecipientList.get(1).serialNumber, is(2L));
+        assertThat(mailRecipientList.get(1).recipientType, is(mailConfig.getRecipientTypeCC()));
+        assertThat(mailRecipientList.get(1).mailAddress, is(cc2));
+        assertThat(mailRecipientList.get(2).mailRequestId, is(mailRequestId));
+        assertThat(mailRecipientList.get(2).serialNumber, is(3L));
+        assertThat(mailRecipientList.get(2).recipientType, is(mailConfig.getRecipientTypeCC()));
+        assertThat(mailRecipientList.get(2).mailAddress, is(cc3));
+        assertThat(mailRecipientList.get(3).mailRequestId, is(mailRequestId));
+        assertThat(mailRecipientList.get(3).serialNumber, is(4L));
+        assertThat(mailRecipientList.get(3).recipientType, is(mailConfig.getRecipientTypeBCC()));
+        assertThat(mailRecipientList.get(3).mailAddress, is(bcc1));
+
+        List<MailAttachedFile> mailAttachedFileList = VariousDbTestHelper.findAll(MailAttachedFile.class);
+        assertThat(mailAttachedFileList.size(), is(0));
+    }
+
+    /**
+     * {@link MailRequester}にトランザクションマネージャを設定した時のテスト。
+     * データ登録が正常に行なわれることを確認する。
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testSpecifiedNullToTransactionManager() throws Exception {
+
+        MailRequester requester = MailUtil.getMailRequester();
+        requester.setMailTransactionManager(null);
+
+        db.beginTransaction();
+        try {
+            FreeTextMailContext ctx = new FreeTextMailContext();
+            ctx.setFrom(from);
+            ctx.addCc(cc1);
+            ctx.addCc(cc2);
+            ctx.addCc(cc3);
+            ctx.addBcc(bcc1);
+            ctx.setReturnPath(returnPath);
+            ctx.setReplyTo(replyTo);
+            ctx.setSubject(subject);
+            ctx.setMailBody(mailBody);
+            ctx.setCharset(charset);
+
+            // 送信要求
+            String mailRequestId = requester.requestToSend(ctx);
+            db.commitTransaction();
+
+            // メール送信要求管理テーブルの確認
+            MailRequest mailRequest = VariousDbTestHelper.findById(MailRequest.class, mailRequestId);
+            assertThat(mailRequest, is(notNullValue()));
+            assertThat(mailRequest.subject, is(subject));
+            assertThat(mailRequest.mailFrom, is(from));
+            assertThat(mailRequest.replyTo, is(replyTo));
+            assertThat(mailRequest.returnPath, is(returnPath));
+            assertThat(mailRequest.charset, is(charset));
+            assertThat(mailRequest.status, is(mailConfig.getStatusUnsent()));
+            assertThat(mailRequest.mailBody, is(mailBody));
+
+            List<MailRecipient> mailRecipientList = VariousDbTestHelper.findAll(MailRecipient.class, "mailRequestId",
+                    "serialNumber");
+            assertThat(mailRecipientList.size(), is(4));
+
+            assertThat(mailRecipientList.get(0).mailRequestId, is(mailRequestId));
+            assertThat(mailRecipientList.get(0).serialNumber, is(1L));
+            assertThat(mailRecipientList.get(0).recipientType, is(mailConfig.getRecipientTypeCC()));
+            assertThat(mailRecipientList.get(0).mailAddress, is(cc1));
+            assertThat(mailRecipientList.get(1).mailRequestId, is(mailRequestId));
+            assertThat(mailRecipientList.get(1).serialNumber, is(2L));
+            assertThat(mailRecipientList.get(1).recipientType, is(mailConfig.getRecipientTypeCC()));
+            assertThat(mailRecipientList.get(1).mailAddress, is(cc2));
+            assertThat(mailRecipientList.get(2).mailRequestId, is(mailRequestId));
+            assertThat(mailRecipientList.get(2).serialNumber, is(3L));
+            assertThat(mailRecipientList.get(2).recipientType, is(mailConfig.getRecipientTypeCC()));
+            assertThat(mailRecipientList.get(2).mailAddress, is(cc3));
+            assertThat(mailRecipientList.get(3).mailRequestId, is(mailRequestId));
+            assertThat(mailRecipientList.get(3).serialNumber, is(4L));
+            assertThat(mailRecipientList.get(3).recipientType, is(mailConfig.getRecipientTypeBCC()));
+            assertThat(mailRecipientList.get(3).mailAddress, is(bcc1));
+
+            List<MailAttachedFile> mailAttachedFileList = VariousDbTestHelper.findAll(MailAttachedFile.class);
+            assertThat(mailAttachedFileList.size(), is(0));
+
         } finally {
             db.endTransaction();
         }
