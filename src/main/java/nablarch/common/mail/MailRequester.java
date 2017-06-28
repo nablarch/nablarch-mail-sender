@@ -4,6 +4,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import nablarch.common.idgenerator.IdGenerator;
+import nablarch.core.db.connection.AppDbConnection;
+import nablarch.core.db.transaction.SimpleDbTransactionExecutor;
 import nablarch.core.db.transaction.SimpleDbTransactionManager;
 import nablarch.core.util.StringUtil;
 import nablarch.core.util.annotation.Published;
@@ -107,7 +109,7 @@ public class MailRequester {
      *            メール送信要求
      * @return メール送信要求ID
      */
-    private String sendMail(MailContext ctx) {
+    private String sendMail(final MailContext ctx) {
 
         // メール送信要求データをバリデーション
         ctx.validate(mailRequestConfig);
@@ -123,19 +125,15 @@ public class MailRequester {
             ctx.setCharset(mailRequestConfig.getDefaultCharset());
         }
 
-        String mailRequestId = null;
         if (mailTransactionManager != null) {
-            try {
-                mailTransactionManager.beginTransaction();
-                mailRequestId = setupMail(ctx);
-            } finally {
-                mailTransactionManager.commitTransaction();
-                mailTransactionManager.endTransaction();
-            }
-        } else {
-            mailRequestId = setupMail(ctx);
+            return new SimpleDbTransactionExecutor<String>(mailTransactionManager) {
+                @Override
+                public String execute(AppDbConnection connection) {
+                    return setupMail(ctx);
+                }
+            }.doTransaction();
         }
-        return mailRequestId;
+        return setupMail(ctx);
     }
 
     /**

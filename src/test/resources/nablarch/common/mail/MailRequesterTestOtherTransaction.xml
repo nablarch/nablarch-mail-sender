@@ -11,10 +11,6 @@
     <import file="nablarch/common/mail/MailTestCommon.xml" />
 
     <!-- DbManagerの設定 -->
-    <component name="dbManager" class="nablarch.core.db.transaction.SimpleDbTransactionManager">
-        <property name="dbTransactionName" value="mail" />
-    </component>
-
     <component name="dbManager-default" class="nablarch.core.db.transaction.SimpleDbTransactionManager">
     </component>
 
