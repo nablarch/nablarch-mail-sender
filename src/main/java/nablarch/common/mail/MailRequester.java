@@ -148,9 +148,16 @@ public class MailRequester {
                 .getMailRequestSbnId());
 
         // 各DBに登録
-        mailRequestTable.insert(mailRequestId, ctx);
-        mailRecipientTable.insert(mailRequestId, ctx, mailConfig);
-        mailAttachedFileTable.insert(mailRequestId, ctx);
+        if (mailTransactionManager != null) {
+            final String dbTransactionName = mailTransactionManager.getDbTransactionName();
+            mailRequestTable.insert(mailRequestId, ctx, dbTransactionName);
+            mailRecipientTable.insert(mailRequestId, ctx, mailConfig, dbTransactionName);
+            mailAttachedFileTable.insert(mailRequestId, ctx, dbTransactionName);
+        } else {
+            mailRequestTable.insert(mailRequestId, ctx);
+            mailRecipientTable.insert(mailRequestId, ctx, mailConfig);
+            mailAttachedFileTable.insert(mailRequestId, ctx);
+        }
         return mailRequestId;
     }
 

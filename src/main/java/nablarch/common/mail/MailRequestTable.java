@@ -215,7 +215,30 @@ public class MailRequestTable implements Initializable {
      */
     public void insert(String mailRequestId, MailContext context) {
         AppDbConnection connection = DbConnectionContext.getConnection();
+        executeInsertSQL(mailRequestId, context, mailConfig, connection);
+    }
 
+    /**
+     * 指定されたトランザクション名を用いてメール送信要求管理テーブルにレコードを登録する。
+     *
+     * @param mailRequestId メールリクエストID
+     * @param context メール送信要求情報
+     * @param transactionName トランザクション名
+     */
+    public void insert(String mailRequestId, MailContext context, String transactionName) {
+        AppDbConnection connection = DbConnectionContext.getConnection(transactionName);
+        executeInsertSQL(mailRequestId, context, mailConfig, connection);
+    }
+
+    /**
+     * メール送信要求管理テーブルにレコードを登録する。
+     * @param mailRequestId メールリクエストID
+     * @param context メール送信先情報を持つオブジェクト
+     * @param mailConfig メールの設定情報を持つオブジェクト
+     * @param connection コネクション
+     */
+    private void executeInsertSQL(String mailRequestId, MailContext context, MailConfig mailConfig,
+                                  AppDbConnection connection) {
         SqlPStatement statement = connection.prepareStatement(insertSql);
         statement.setString(1, mailRequestId);
         statement.setString(2, context.getSubject());
