@@ -888,10 +888,6 @@ public class MailRequesterTest extends MailTestSupport {
         final SimpleDbTransactionManager db = SystemRepository.get("dbManager-default");
         MailRequester requester = MailUtil.getMailRequester();
 
-        // 採番テーブルの初期値を確認
-        List<MailSbnTable> mailSbnTables = VariousDbTestHelper.findAll(MailSbnTable.class);
-        assertThat(mailSbnTables.get(0).no, is(0L));
-
         try {
             db.beginTransaction();
             FreeTextMailContext ctx = new FreeTextMailContext();
@@ -909,8 +905,9 @@ public class MailRequesterTest extends MailTestSupport {
             // 送信要求
             String mailRequestId = requester.requestToSend(ctx);
 
+            // 採番テーブルの確認
             // 別トランザクションでコミットされているため、インクリメントされること
-            mailSbnTables = VariousDbTestHelper.findAll(MailSbnTable.class);
+            List<MailSbnTable> mailSbnTables = VariousDbTestHelper.findAll(MailSbnTable.class);
             assertThat(mailSbnTables.get(0).no, is(1L));
 
             // メール送信要求管理テーブルの確認
@@ -948,9 +945,6 @@ public class MailRequesterTest extends MailTestSupport {
             List<MailAttachedFile> mailAttachedFileList = VariousDbTestHelper.findAll(MailAttachedFile.class);
             assertThat(mailAttachedFileList.size(), is(0));
             db.commitTransaction();
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail();
         } finally {
             db.endTransaction();
         }
