@@ -4,6 +4,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import nablarch.common.idgenerator.IdGenerator;
+import nablarch.core.db.connection.AppDbConnection;
+import nablarch.core.db.transaction.SimpleDbTransactionExecutor;
+import nablarch.core.db.transaction.SimpleDbTransactionManager;
 import nablarch.core.util.StringUtil;
 import nablarch.core.util.annotation.Published;
 
@@ -49,6 +52,9 @@ public class MailRequester {
 
     /** メールテンプレート管理テーブルのスキーマ情報 */
     private MailTemplateTable mailTemplateTable;
+
+    /** メール送信時のDB登録に利用するトランザクションマネージャ */
+    private SimpleDbTransactionManager mailTransactionManager;
 
     /**
      * 非定型メールの送信要求を行う。
@@ -103,7 +109,7 @@ public class MailRequester {
      *            メール送信要求
      * @return メール送信要求ID
      */
-    private String sendMail(MailContext ctx) {
+    private String sendMail(final MailContext ctx) {
 
         // メール送信要求データをバリデーション
         ctx.validate(mailRequestConfig);
@@ -119,15 +125,39 @@ public class MailRequester {
             ctx.setCharset(mailRequestConfig.getDefaultCharset());
         }
 
+        if (mailTransactionManager != null) {
+            return new SimpleDbTransactionExecutor<String>(mailTransactionManager) {
+                @Override
+                public String execute(AppDbConnection connection) {
+                    return setupMail(ctx);
+                }
+            }.doTransaction();
+        }
+        return setupMail(ctx);
+    }
+
+    /**
+     * メール送信要求IDの採番、送信DBへの登録処理
+     *
+     * @param ctx メール送信要求
+     * @return メール送信要求ID
+     */
+    private String setupMail(MailContext ctx) {
         // メール送信要求ID採番
         String mailRequestId = mailRequestIdGenerator.generateId(mailConfig
                 .getMailRequestSbnId());
 
         // 各DBに登録
-        mailRequestTable.insert(mailRequestId, ctx);
-        mailRecipientTable.insert(mailRequestId, ctx, mailConfig);
-        mailAttachedFileTable.insert(mailRequestId, ctx);
-
+        if (mailTransactionManager != null) {
+            final String dbTransactionName = mailTransactionManager.getDbTransactionName();
+            mailRequestTable.insert(mailRequestId, ctx, dbTransactionName);
+            mailRecipientTable.insert(mailRequestId, ctx, mailConfig, dbTransactionName);
+            mailAttachedFileTable.insert(mailRequestId, ctx, dbTransactionName);
+        } else {
+            mailRequestTable.insert(mailRequestId, ctx);
+            mailRecipientTable.insert(mailRequestId, ctx, mailConfig);
+            mailAttachedFileTable.insert(mailRequestId, ctx);
+        }
         return mailRequestId;
     }
 
@@ -222,5 +252,15 @@ public class MailRequester {
      */
     public void setMailTemplateTable(MailTemplateTable mailTemplateTable) {
         this.mailTemplateTable = mailTemplateTable;
+    }
+
+    /**
+     * メール送信時に利用するトランザクションマネージャを設定する。
+     *
+     * @param mailTransactionManager
+     *             トランザクションマネージャ
+     */
+    public void setMailTransactionManager(SimpleDbTransactionManager mailTransactionManager) {
+        this.mailTransactionManager = mailTransactionManager;
     }
 }

@@ -109,7 +109,27 @@ public class MailAttachedFileTable implements Initializable {
      */
     public void insert(String mailRequestId, MailContext context) {
         AppDbConnection connection = DbConnectionContext.getConnection();
+        executeInsertSQL(mailRequestId, context, connection);
+    }
 
+    /**
+     * 指定されたトランザクション名を用いて添付ファイル管理テーブルに添付ファイルの情報を登録する。
+     *
+     * @param mailRequestId メールリクエストID
+     * @param context 添付ファイルの情報
+     */
+    public void insert(String mailRequestId, MailContext context, String transactionName) {
+        AppDbConnection connection = DbConnectionContext.getConnection(transactionName);
+        executeInsertSQL(mailRequestId, context, connection);
+    }
+
+    /**
+     * 添付ファイル管理テーブルに添付ファイルの情報を登録する。
+     * @param mailRequestId メールリクエストID
+     * @param context 添付ファイルの情報
+     * @param connection コネクション
+     */
+    private void executeInsertSQL(String mailRequestId, MailContext context, AppDbConnection connection) {
         int serialNo = 1;
         SqlPStatement statement = connection.prepareStatement(insertSql);
         statement.setString(1, mailRequestId);
