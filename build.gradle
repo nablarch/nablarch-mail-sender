@@ -36,9 +36,6 @@ dependencies {
   testRuntime 'com.sun.mail:pop3:1.4.4'
   testRuntime 'com.sun.mail:smtp:1.4.4'
 
-  testRuntime 'com.oracle:ojdbc6:11.2.0.2.0'
-  testRuntime 'com.oracle:ucp:11.2.0.3.0'
-
   testRuntime "com.nablarch.framework:nablarch-common-jdbc:${nablarchCommonJdbcVersion}"
   testRuntime "com.nablarch.framework:nablarch-common-idgenerator-jdbc:${nablarchCommonIdgeneratorJdbcVersion}"
 

@@ -128,12 +128,30 @@ public class MailRequester {
         if (mailTransactionManager != null) {
             return new SimpleDbTransactionExecutor<String>(mailTransactionManager) {
                 @Override
-                public String execute(AppDbConnection connection) {
-                    return setupMail(ctx);
+                public String execute(final AppDbConnection connection) {
+                    return setupMailWithTransactionName(ctx, mailTransactionManager.getDbTransactionName());
                 }
             }.doTransaction();
+        } else {
+            return setupMail(ctx);
         }
-        return setupMail(ctx);
+    }
+
+    /**
+     * メール送信要求IDの採番、送信DBへの登録処理
+     *
+     * @param ctx メール送信要求
+     * @param transactionName トランザクション名
+     * @return メール送信要求ID
+     */
+    private String setupMailWithTransactionName(final MailContext ctx, final String transactionName) {
+        // メール送信要求ID採番
+        final String mailRequestId = mailRequestIdGenerator.generateId(mailConfig.getMailRequestSbnId());
+        // 各DBに登録
+        mailRequestTable.insert(mailRequestId, ctx, transactionName);
+        mailRecipientTable.insert(mailRequestId, ctx, mailConfig, transactionName);
+        mailAttachedFileTable.insert(mailRequestId, ctx, transactionName);
+        return mailRequestId;
     }
 
     /**
@@ -142,22 +160,13 @@ public class MailRequester {
      * @param ctx メール送信要求
      * @return メール送信要求ID
      */
-    private String setupMail(MailContext ctx) {
+    private String setupMail(final MailContext ctx) {
         // メール送信要求ID採番
-        String mailRequestId = mailRequestIdGenerator.generateId(mailConfig
-                .getMailRequestSbnId());
+        final String mailRequestId = mailRequestIdGenerator.generateId(mailConfig.getMailRequestSbnId());
 
-        // 各DBに登録
-        if (mailTransactionManager != null) {
-            final String dbTransactionName = mailTransactionManager.getDbTransactionName();
-            mailRequestTable.insert(mailRequestId, ctx, dbTransactionName);
-            mailRecipientTable.insert(mailRequestId, ctx, mailConfig, dbTransactionName);
-            mailAttachedFileTable.insert(mailRequestId, ctx, dbTransactionName);
-        } else {
-            mailRequestTable.insert(mailRequestId, ctx);
-            mailRecipientTable.insert(mailRequestId, ctx, mailConfig);
-            mailAttachedFileTable.insert(mailRequestId, ctx);
-        }
+        mailRequestTable.insert(mailRequestId, ctx);
+        mailRecipientTable.insert(mailRequestId, ctx, mailConfig);
+        mailAttachedFileTable.insert(mailRequestId, ctx);
         return mailRequestId;
     }
 

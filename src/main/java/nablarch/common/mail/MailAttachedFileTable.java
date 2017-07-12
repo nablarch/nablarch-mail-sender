@@ -117,6 +117,7 @@ public class MailAttachedFileTable implements Initializable {
      *
      * @param mailRequestId メールリクエストID
      * @param context 添付ファイルの情報
+     * @param transactionName トランザクション名
      */
     public void insert(String mailRequestId, MailContext context, String transactionName) {
         AppDbConnection connection = DbConnectionContext.getConnection(transactionName);
