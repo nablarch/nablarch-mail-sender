@@ -1,0 +1,21 @@
+language: java
+branches:
+  only:
+  - master
+  - develop
+  - release-*
+before_install:
+- chmod +x gradlew
+install: true
+cache:
+  directories:
+  - $HOME/.gradle/caches/
+  - $HOME/.gradle/wrapper/
+script:
+- 'curl -H ''Cache-Control: no-cache'' -O https://raw.githubusercontent.com/nablarch/nablarch-ci-script/master/travis-ci/nablarch-build.sh'
+- chmod +x ./nablarch-build.sh && ./nablarch-build.sh
+before_cache:
+- rm -f $HOME/.gradle/caches/modules-2/modules-2.lock
+notifications:
+  slack:
+    secure: m2zE9SVCE9t/+/6SHgrctjRPw7qXDcFPwfvFJ7a+xYKfhpNv7pv4atalPDplijJ6EXfUd1szBnJEwfbDyA0DbszRyKRRb8GCK1IG221JnLNsrg2JL6nda2ffsKQTzlpS8WTY1NZmGHtzQuZjScRjANyTQtCm3kyJl5PYGSrcuXtWznov1KMvipPNAVZh6FJn6XIEOgjXSnRrLPonNhTmIDGHaq6FjLHGLhP7V1F6oYeKg/tVIpwCnsg2OU5B8MYcfC8zUABObRgMi0VOr/CtLoz3ohLtAF9sH3EAF1whvzuDoexu+Q8jqytNRnh6Xf+7EexMalgArv+IeLKc3S2Yfn6mWRBUyIZCB/8uby5p+bS92FqOgnAp3oleo/n8f7j4lrD7B3YJnUzOf0SyOF5UPr0B7E9jogGf6l+dUoz1w/ERMRuS6CiRbzztNp/R11P1cO08hzhkELx301RNWqaVAlMI1zvZA23A5j95HctYg4uVGcLNtwqIgU5T4ZvVM3An+XS4dQUo+gKoRmENK18fT5rE/3ntmiHepUCXsC1kDHUtP/yR44/zn8dKZ++Hnap7R+Tf7tVgFLN9IzabfSEpVhRq87W72DB6Jy2EWatDg2vVmBsSN9FuH6hfK+BkVhGIfCaiYwTXQ+0sZqasbQGSgz1qcqDpSL4tRb2ICtzjoI4=
