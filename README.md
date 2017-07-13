@@ -1,5 +1,10 @@
 # nablarch-mail-sender
 
+| master | develop |
+|:-----------|:------------|
+|[![Build Status](https://travis-ci.org/nablarch/nablarch-mail-sender.svg?branch=master)](https://travis-ci.org/nablarch/nablarch-mail-sender)|[![Build Status](https://travis-ci.org/nablarch/nablarch-mail-sender.svg?branch=develop)](https://travis-ci.org/nablarch/nablarch-mail-sender)|
+
+
 ## テスト環境のセットアップ
 
 本モジュールのテストの実行には、メールサーバーとして Apache が提供する James をセットアップし、
