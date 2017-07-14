@@ -93,7 +93,7 @@ public class MailTestSupport {
         sessionProperties.setProperty("mail.smtp.host", "localhost");
         sessionProperties.setProperty("mail.host", "localhost");
         sessionProperties.setProperty("mail.pop3.host", "localhost");
-        sessionProperties.setProperty("mail.pop3.port", "110");
+        sessionProperties.setProperty("mail.pop3.port", "10110");
     }
 
     @Before
