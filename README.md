@@ -1,5 +1,10 @@
 # nablarch-mail-sender
 
+| master | develop |
+|:-----------|:------------|
+|[![Build Status](https://travis-ci.org/nablarch/nablarch-mail-sender.svg?branch=master)](https://travis-ci.org/nablarch/nablarch-mail-sender)|[![Build Status](https://travis-ci.org/nablarch/nablarch-mail-sender.svg?branch=develop)](https://travis-ci.org/nablarch/nablarch-mail-sender)|
+
+
 ## テスト環境のセットアップ
 
 本モジュールのテストの実行には、メールサーバーとして Apache が提供する James をセットアップし、
@@ -8,7 +13,8 @@
 1. James のダウンロード。<br>
    アーカイブをダウンロードし、任意のパスに展開します。以下、展開したパスを $JAMES_HOME と記述します。
 2. James のSMTPのポート番号の設定。<br>
-   $JAMES_HOME\apps\james\SAR-INF の config.xmlを開き、「smtpserver」で検索して、portの値を26にします。
+   $JAMES_HOME\apps\james\SAR-INF の config.xmlを開き、「smtpserver」で検索してportの値を10025に、「pop3server」
+   で検索してportの値を10110にします。
 3. James の起動。<br>
    $JAMES_HOME\bin\run.bat を実行し、James を起動します。<br>
 4. James の管理コンソールの起動。<br>
