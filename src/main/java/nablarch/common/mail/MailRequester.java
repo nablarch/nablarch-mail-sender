@@ -103,6 +103,24 @@ public class MailRequester {
     }
 
     /**
+     * テンプレートエンジンを使用した定型メールの送信要求を行う。
+     * 
+     * @param ctx テンプレートエンジン定型メール送信要求
+     * @return メール送信要求ID
+     * @throws AttachedFileSizeOverException
+     *             添付ファイルのサイズが上限値を超えた場合
+     * @throws RecipientCountException
+     *             宛先数が上限値を超えた場合
+     */
+    @Published
+    public String requestToSend(TemplateEngineMailContext ctx)
+            throws AttachedFileSizeOverException, RecipientCountException {
+        TemplateEngineMailProcessor processor = TemplateEngineMailProcessorFactory.getProcessor();
+        ctx.prepareSubjectAndMailBody(processor);
+        return sendMail(ctx);
+    }
+
+    /**
      * メール送信要求処理
      * 
      * @param ctx
