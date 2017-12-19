@@ -12,9 +12,13 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Collections;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import nablarch.core.db.transaction.SimpleDbTransactionManager;
+import nablarch.core.repository.ObjectLoader;
 import nablarch.core.repository.SystemRepository;
 import nablarch.core.repository.di.DiContainer;
 import nablarch.core.repository.di.config.xml.XmlComponentDefinitionLoader;
@@ -947,6 +951,73 @@ public class MailRequesterTest extends MailTestSupport {
             db.commitTransaction();
         } finally {
             db.endTransaction();
+        }
+    }
+
+    /**
+     * テンプレートエンジンを使用した定型メール送信正常系
+     *
+     * @throws SQLException
+     * @throws IOException
+     */
+    @Test
+    public void testTemplateEngineMailOK() throws SQLException, IOException {
+        SystemRepository.load(new ObjectLoader() {
+            @Override
+            public Map<String, Object> load() {
+                Object processor = new MockTemplateEngineMailProcessor();
+                return Collections.singletonMap("templateEngineMailProcessor", processor);
+            }
+        });
+
+        MailRequester requester = MailUtil.getMailRequester();
+
+        db.beginTransaction();
+        try {
+            //データ準備
+            TemplateMailContext tctx = new TemplateMailContext();
+            tctx.setFrom(from);
+            tctx.addTo(to1);
+            tctx.addCc(cc1);
+            tctx.addBcc(bcc1);
+            tctx.setTemplateId(mailTemplateId);
+            tctx.setLang(lang);
+
+            tctx.setReplaceKeyValue("1", "テスト");
+            tctx.setVariable("2", 123);
+
+            //送信要求!
+            String mailRequestId = requester.requestToSend(tctx);
+            db.commitTransaction();
+
+            // メール送信要求管理TBLの確認
+            MailRequest mailRequest = VariousDbTestHelper.findById(MailRequest.class, mailRequestId);
+            assertThat("要求テーブルのレコード", mailRequest, is(notNullValue()));
+
+            assertThat("送信者", mailRequest.mailFrom, is(from));
+            assertThat("返信先はデフォルト", mailRequest.replyTo, is(mailRequestConfig.getDefaultReplyTo()));
+            assertThat("差し戻し先もデフォルト", mailRequest.returnPath, is(mailRequestConfig.getDefaultReturnPath()));
+            assertThat("文字セット", mailRequest.charset, is(mailRequestConfig.getDefaultCharset()));
+            assertThat("ステータス", mailRequest.status, is(mailConfig.getStatusUnsent()));
+
+            String expectedSubject = "subject";
+            String expectedMailBody = mailTemplateId + LINE_SEPARATOR + "テスト" + LINE_SEPARATOR
+                    + "123";
+
+            assertThat("件名", mailRequest.subject, is(expectedSubject));
+            assertThat("本文", mailRequest.mailBody, is(expectedMailBody));
+
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    private static class MockTemplateEngineMailProcessor implements TemplateEngineMailProcessor {
+        @Override
+        public TemplateEngineProcessedResult process(String template,
+                Map<String, Object> variables) {
+            return new TemplateEngineProcessedResult("subject", template + LINE_SEPARATOR
+                    + variables.get("1") + LINE_SEPARATOR + variables.get("2"));
         }
     }
 

@@ -9,15 +9,15 @@ import java.util.Map;
 import org.junit.Test;
 
 /**
- * {@link TemplateEngineMailContext}のテストクラス。
+ * {@link TemplateEngineContextPreparer}のテストクラス。
  */
-public class TemplateEngineMailContextTest {
+public class TemplateEngineContextPreparerTest {
 
     @Test
     public void testPrepareSubjectAndMailBody() {
-        TemplateEngineMailContext ctx = new TemplateEngineMailContext();
-        ctx.setTemplate("hoge.template");
-        ctx.setVariable("foo", "hello");
+        TemplateMailContext ctx = new TemplateMailContext();
+        ctx.setTemplateId("hoge.template");
+        ctx.setReplaceKeyValue("foo", "hello");
         ctx.setVariable("bar", 123);
 
         assertThat("処理前はコンテキストの件名がnullであることを確認", ctx.getSubject(), is(nullValue()));
@@ -25,7 +25,7 @@ public class TemplateEngineMailContextTest {
 
         MockTemplateEngineMailProcessor processor = new MockTemplateEngineMailProcessor(
                 new TemplateEngineProcessedResult("件名テスト", "本文テスト"));
-        ctx.prepareSubjectAndMailBody(processor);
+        new TemplateEngineContextPreparer().prepareSubjectAndMailBody(ctx, processor);
 
         assertThat("テンプレートがprocessorに渡されていることを確認", processor.template, is("hoge.template"));
         assertThat("変数がprocessorに渡されていることを確認", processor.variables, allOf(

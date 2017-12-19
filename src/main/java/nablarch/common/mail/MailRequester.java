@@ -56,6 +56,12 @@ public class MailRequester {
     /** メール送信時のDB登録に利用するトランザクションマネージャ */
     private SimpleDbTransactionManager mailTransactionManager;
 
+    /** {@link TemplateEngineMailProcessor}のファクトリ */
+    private final TemplateEngineMailProcessorFactory templateEngineMailProcessorFactory = new TemplateEngineMailProcessorFactory();
+
+    /** テンプレートエンジンを使用して件名と本文の準備をするクラス */
+    private final TemplateEngineContextPreparer templateEngineContextPreparer = new TemplateEngineContextPreparer();
+
     /**
      * 非定型メールの送信要求を行う。
      * 
@@ -86,6 +92,12 @@ public class MailRequester {
     public String requestToSend(TemplateMailContext ctx)
             throws AttachedFileSizeOverException, RecipientCountException {
 
+        TemplateEngineMailProcessor processor = templateEngineMailProcessorFactory.getProcessor();
+        if (processor != null) {
+            templateEngineContextPreparer.prepareSubjectAndMailBody(ctx, processor);
+            return sendMail(ctx);
+        }
+
         // テンプレートから件名・本文を組み立てる。
         MailTemplateTable.MailTemplate mailTemplate = mailTemplateTable.find(ctx.getTemplateId(), ctx.getLang());
 
@@ -99,24 +111,6 @@ public class MailRequester {
 
         ctx.setCharset(mailTemplate.getCharset());
 
-        return sendMail(ctx);
-    }
-
-    /**
-     * テンプレートエンジンを使用した定型メールの送信要求を行う。
-     * 
-     * @param ctx テンプレートエンジン定型メール送信要求
-     * @return メール送信要求ID
-     * @throws AttachedFileSizeOverException
-     *             添付ファイルのサイズが上限値を超えた場合
-     * @throws RecipientCountException
-     *             宛先数が上限値を超えた場合
-     */
-    @Published
-    public String requestToSend(TemplateEngineMailContext ctx)
-            throws AttachedFileSizeOverException, RecipientCountException {
-        TemplateEngineMailProcessor processor = TemplateEngineMailProcessorFactory.getProcessor();
-        ctx.prepareSubjectAndMailBody(processor);
         return sendMail(ctx);
     }
 

@@ -20,6 +20,8 @@ import nablarch.core.repository.SystemRepository;
  */
 public class TemplateEngineMailProcessorFactoryTest {
 
+    private final TemplateEngineMailProcessorFactory sut = new TemplateEngineMailProcessorFactory();
+
     @Rule
     public ExpectedException expectedException = ExpectedException.none();
 
@@ -41,20 +43,8 @@ public class TemplateEngineMailProcessorFactoryTest {
                 return Collections.singletonMap("templateEngineMailProcessor", processor);
             }
         });
-        TemplateEngineMailProcessor processor = TemplateEngineMailProcessorFactory.getProcessor();
+        TemplateEngineMailProcessor processor = sut.getProcessor();
         assertThat(processor, is(notNullValue()));
-    }
-
-    /**
-     * システムリポジトリからプロセッサーが取得できない場合に例外が送出されること。
-     */
-    @Test
-    public void testGetProcessor_undefined() {
-        expectedException.expect(IllegalArgumentException.class);
-        expectedException
-                .expectMessage(is(
-                        "specified templateEngineMailProcessor is not registered in SystemRepository."));
-        TemplateEngineMailProcessorFactory.getProcessor();
     }
 
     /**
