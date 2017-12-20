@@ -20,7 +20,8 @@ public class TemplateMailContextTest {
     public void setUp() {
         sut.setVariable("1", "foo");
         sut.setVariable("2", 123);
-        sut.setReplaceKeyValue("3", "bar");
+        sut.setVariable("3", null);
+        sut.setReplaceKeyValue("4", "bar");
     }
 
     /**
@@ -29,11 +30,12 @@ public class TemplateMailContextTest {
     @Test
     public void testGetVariables() {
         Map<String, Object> variables = sut.getVariables();
-        assertThat(variables.size(), is(3));
+        assertThat(variables.size(), is(4));
         assertThat(variables, allOf(
                 hasEntry("1", (Object) "foo"),
                 hasEntry("2", (Object) 123),
-                hasEntry("3", (Object) "bar")));
+                hasEntry("3", (Object) null),
+                hasEntry("4", (Object) "bar")));
     }
 
     /**
@@ -42,10 +44,11 @@ public class TemplateMailContextTest {
     @Test
     public void testGetReplaceKeyValue() {
         Map<String, String> replaceKeyValue = sut.getReplaceKeyValue();
-        assertThat(replaceKeyValue.size(), is(3));
+        assertThat(replaceKeyValue.size(), is(4));
         assertThat(replaceKeyValue, allOf(
                 hasEntry("1", "foo"),
                 hasEntry("2", "123"),
-                hasEntry("3", "bar")));
+                hasEntry("3", null),
+                hasEntry("4", "bar")));
     }
 }
