@@ -1,8 +1,5 @@
 package nablarch.common.mail;
 
-import java.util.Map;
-import java.util.Map.Entry;
-
 import nablarch.common.idgenerator.IdGenerator;
 import nablarch.core.db.connection.AppDbConnection;
 import nablarch.core.db.transaction.SimpleDbTransactionExecutor;
@@ -50,14 +47,11 @@ public class MailRequester {
     /** 添付ファイル管理テーブルのスキーマ情報 */
     private MailAttachedFileTable mailAttachedFileTable;
 
-    /** メールテンプレート管理テーブルのスキーマ情報 */
-    private MailTemplateTable mailTemplateTable;
-
     /** メール送信時のDB登録に利用するトランザクションマネージャ */
     private SimpleDbTransactionManager mailTransactionManager;
 
-    /** {@link TemplateEngineMailProcessor}のファクトリ */
-    private final TemplateEngineMailProcessorFactory templateEngineMailProcessorFactory = new TemplateEngineMailProcessorFactory();
+    /** 定型メールの件名と本文を構築するテンプレートエンジン処理クラス */
+    private TemplateEngineMailProcessor templateEngineMailProcessor;
 
     /** テンプレートエンジンを使用して件名と本文の準備をするクラス */
     private final TemplateEngineContextPreparer templateEngineContextPreparer = new TemplateEngineContextPreparer();
@@ -91,26 +85,7 @@ public class MailRequester {
     @Published
     public String requestToSend(TemplateMailContext ctx)
             throws AttachedFileSizeOverException, RecipientCountException {
-
-        TemplateEngineMailProcessor processor = templateEngineMailProcessorFactory.getProcessor();
-        if (processor != null) {
-            templateEngineContextPreparer.prepareSubjectAndMailBody(ctx, processor);
-            return sendMail(ctx);
-        }
-
-        // テンプレートから件名・本文を組み立てる。
-        MailTemplateTable.MailTemplate mailTemplate = mailTemplateTable.find(ctx.getTemplateId(), ctx.getLang());
-
-        ctx.setSubject(replaceTemplateString(
-                ctx.getReplaceKeyValue(),
-                mailTemplate.getSubject()));
-
-        ctx.setMailBody(replaceTemplateString(
-                ctx.getReplaceKeyValue(),
-                mailTemplate.getMailBody()));
-
-        ctx.setCharset(mailTemplate.getCharset());
-
+        templateEngineContextPreparer.prepareSubjectAndMailBody(ctx, templateEngineMailProcessor);
         return sendMail(ctx);
     }
 
@@ -182,27 +157,6 @@ public class MailRequester {
         return mailRequestId;
     }
 
-    /**
-     * テンプレートの文字列を置換する。
-     * 
-     * @param replaceKeyValue
-     *            プレースホルダと置換文字列のマップ
-     * @param targetStr
-     *            置換対象文字列
-     * @return targetStr 置換後の文字列
-     */
-    private String replaceTemplateString(Map<String, String> replaceKeyValue,
-            String targetStr) {
-        for (Entry<String, String> entry : replaceKeyValue.entrySet()) {
-            final String key = entry.getKey();
-            if (key == null) {
-                throw new IllegalArgumentException("replace key must not be null");
-            }
-            final String value = entry.getValue();
-            targetStr = targetStr.replace('{' + key + '}', value == null ? "" : value);
-        }
-        return targetStr;
-    }
 
     /**
      * メール送信要求共通設定を保持するデータオブジェクトを設定する。
@@ -266,16 +220,6 @@ public class MailRequester {
     }
 
     /**
-     * メールテンプレート管理テーブルのスキーマ情報を設定する。
-     * 
-     * @param mailTemplateTable
-     *            メールテンプレート管理テーブルのスキーマ情報
-     */
-    public void setMailTemplateTable(MailTemplateTable mailTemplateTable) {
-        this.mailTemplateTable = mailTemplateTable;
-    }
-
-    /**
      * メール送信時に利用するトランザクションマネージャを設定する。
      *
      * @param mailTransactionManager
@@ -283,5 +227,16 @@ public class MailRequester {
      */
     public void setMailTransactionManager(SimpleDbTransactionManager mailTransactionManager) {
         this.mailTransactionManager = mailTransactionManager;
+    }
+
+    /**
+     * 定型メールの件名と本文を構築するテンプレートエンジン処理クラスを設定する。
+     * 
+     * @param templateEngineMailProcessor
+     *             定型メールの件名と本文を構築するテンプレートエンジン処理クラス
+     */
+    public void setTemplateEngineMailProcessor(
+            TemplateEngineMailProcessor templateEngineMailProcessor) {
+        this.templateEngineMailProcessor = templateEngineMailProcessor;
     }
 }

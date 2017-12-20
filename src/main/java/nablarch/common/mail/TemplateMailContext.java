@@ -1,7 +1,9 @@
 package nablarch.common.mail;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import nablarch.core.util.annotation.Published;
 
@@ -18,12 +20,7 @@ public class TemplateMailContext extends MailContext {
     /** 言語 */
     private String lang;
 
-    /** プレースホルダと置換文字列のマップ */
-    private final Map<String, String> replaceKeyValue = new HashMap<String, String>();
-
     /** テンプレートとマージする変数 */
-    //replaceKeyValue は Map<String, String> のため構造を持ったクラスを渡せないので、
-    //Map<String, Object> な変数保管場所を新たに追加する。
     private final Map<String, Object> variables = new HashMap<String, Object>();
 
     /**
@@ -78,19 +75,35 @@ public class TemplateMailContext extends MailContext {
      * プレースホルダのキーと置換文字列のマップを取得する。
      * 
      * @return プレースホルダと置換文字列のマップ
+     * @deprecated 当メソッドは5u13より前から存在する定型メール機能のためにある。
+     *               当メソッドの仕様を満たしつつより柔軟な機能をもつ{@link #getVariables()}が追加されたので今後はそちらを使用すること。
      */
     @Published(tag = "architect")
+    @Deprecated
     public Map<String, String> getReplaceKeyValue() {
+        Map<String, String> replaceKeyValue = new HashMap<String, String>();
+        for (Entry<String, Object> entry : variables.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if (value instanceof String) {
+                replaceKeyValue.put(key, (String) value);
+            } else if (value == null) {
+                replaceKeyValue.put(key, null);
+            } else {
+                replaceKeyValue.put(key, value.toString());
+            }
+        }
         return replaceKeyValue;
     }
 
+    /**
+     * テンプレートとマージする変数を取得する。
+     * 
+     * @return テンプレートとマージする変数
+     */
     @Published(tag = "architect")
     public Map<String, Object> getVariables() {
-        Map<String, Object> vars = new HashMap<String, Object>(
-                variables.size() + replaceKeyValue.size());
-        vars.putAll(replaceKeyValue);
-        vars.putAll(variables);
-        return vars;
+        return Collections.unmodifiableMap(variables);
     }
 
     /**
@@ -104,18 +117,17 @@ public class TemplateMailContext extends MailContext {
      *
      * @param key プレースホルダのキー
      * @param value 置換文字列(null不可)
+     * @deprecated 当メソッドは5u13より前から存在する定型メール機能のためにある。
+     *               当メソッドの仕様を満たしつつより柔軟な機能をもつ{@link #setVariable(String, Object)}が追加されたので今後はそちらを使用すること。
      */
     @Published
+    @Deprecated
     public void setReplaceKeyValue(String key, String value) {
-        this.replaceKeyValue.put(key, value);
+        this.variables.put(key, value);
     }
 
     /**
      * テンプレートとマージする変数を追加する。
-     * <p>
-     * {@link #setReplaceKeyValue(String, String)}とは異なり、こちらのメソッドで保存される変数は
-     * テンプレートエンジンを利用した定型メール送信処理でのみ利用される。
-     * </p>
      * 
      * @param name 変数名
      * @param value 値

@@ -12,16 +12,21 @@ public class TemplateEngineProcessedResult {
     private final String subject;
     /** 本文 */
     private final String mailBody;
+    /** 文字セット */
+    private final String charset;
 
     /**
      * {@link TemplateEngineProcessedResult}のインスタンスを生成する。
      * 
      * @param subject 件名
      * @param mailBody 本文
+     * @param charset 文字セット
      */
-    public TemplateEngineProcessedResult(final String subject, final String mailBody) {
+    public TemplateEngineProcessedResult(final String subject, final String mailBody,
+            final String charset) {
         this.subject = subject;
         this.mailBody = mailBody;
+        this.charset = charset;
     }
 
     /**
@@ -37,7 +42,9 @@ public class TemplateEngineProcessedResult {
      * <li>3行目以降を本文とみなす</li>
      * </ol>
      * 
+     * <p>
      * 例えば、このファクトリーメソッドに次のような文字列が渡されたとする。
+     * </p>
      * 
      * <pre>{@code テスト件名
      * 
@@ -46,7 +53,13 @@ public class TemplateEngineProcessedResult {
      * テスト本文３
      * }</pre>
      * 
+     * <p>
      * この場合、{@code テスト件名}が件名となり、{@code テスト本文１}以降が本文となる。
+     * </p>
+     * 
+     * <p>
+     * なお、このファクトリーメソッドでは文字セットは設定されない。
+     * </p>
      * 
      * @param value 件名と本文を含む文字列
      * @return 件名と本文がセットされたインスタンス
@@ -80,7 +93,7 @@ public class TemplateEngineProcessedResult {
         String subject = tokenizer.nextLine();
         tokenizer.nextLine(); //2行目は読み捨てる
         String mailBody = tokenizer.remaining();
-        return new TemplateEngineProcessedResult(subject, mailBody);
+        return new TemplateEngineProcessedResult(subject, mailBody, null);
     }
 
     /**
@@ -99,5 +112,14 @@ public class TemplateEngineProcessedResult {
      */
     public String getMailBody() {
         return mailBody;
+    }
+
+    /**
+     * 文字セットを取得する。
+     * 
+     * @return 文字セット
+     */
+    public String getCharset() {
+        return charset;
     }
 }
