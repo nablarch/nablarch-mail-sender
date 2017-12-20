@@ -18,10 +18,10 @@ public class TemplateEngineContextPreparer {
      */
     public void prepareSubjectAndMailBody(
             TemplateMailContext ctx, TemplateEngineMailProcessor processor) {
-        String template = ctx.getTemplateId();
+        String templateId = ctx.getTemplateId();
         String lang = ctx.getLang();
         Map<String, Object> variables = ctx.getVariables();
-        TemplateEngineProcessedResult result = processor.process(template, lang, variables);
+        TemplateEngineProcessedResult result = processor.process(templateId, lang, variables);
         ctx.setSubject(result.getSubject());
         ctx.setMailBody(result.getMailBody());
         ctx.setCharset(result.getCharset());
