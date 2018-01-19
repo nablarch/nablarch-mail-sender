@@ -103,6 +103,7 @@ public class MailSenderTest extends MailTestSupport {
      * 処理が正常終了する場合のテスト<br/>
      * <br/>
      * TO:0件,CC:複数,BCC1件,添付ファイルなし
+     * <br/>
      *
      * @throws Exception
      */
@@ -111,11 +112,12 @@ public class MailSenderTest extends MailTestSupport {
 
         // データ準備
         String mailRequestId = "1";
-        String subject = "正常系1";
+        String subject = "正常系1\uD83C\uDF63";
+        String body = mailBody + "\uD83C\uDF63";
 
         VariousDbTestHelper.setUpTable(
                 new MailRequest(mailRequestId, subject, from, replyTo, returnPath, charset,
-                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody));
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, body));
 
         VariousDbTestHelper.setUpTable(
                 new MailRecipient(mailRequestId, 1L, mailConfig.getRecipientTypeCC(), cc1),
@@ -189,7 +191,7 @@ public class MailSenderTest extends MailTestSupport {
         assertThat("charset", message.getContentType(), containsString(charset));
 
         assertThat("添付ファイルなしなので", message.getContent(), is(instanceOf(String.class)));
-        assertThat("本文", (String) message.getContent(), is(mailBody));
+        assertThat("本文", (String) message.getContent(), is(body));
 
         // DBの検証（ステータスと送信日時）
         List<MailRequest> mailRequestList = VariousDbTestHelper.findAll(MailRequest.class);
