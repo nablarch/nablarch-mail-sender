@@ -75,7 +75,7 @@ public class MailTestSupport {
     protected static String aFileContentType = "text/plain";
 
     /** メール受信待ち時間 */
-    private long waitTime = 3000;
+    private long waitTime = 300;
 
     @BeforeClass
     public static void beforeClass() {
@@ -209,7 +209,7 @@ public class MailTestSupport {
 
     public Folder openFolder(Store store) throws Exception {
         Folder folder = null;
-        for (int i = 0; i < 15; i++) {
+        for (int i = 0; i < 200; i++) {
             // ちょっと待つ...
             Thread.sleep(waitTime);
             folder = store.getFolder("INBOX");
@@ -224,7 +224,7 @@ public class MailTestSupport {
 
     public Folder openFolder(Store store, String expectedSubject) throws Exception {
         Folder folder = null;
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 200; i++) {
             // ちょっと待つ...
             Thread.sleep(waitTime);
             store.close();
