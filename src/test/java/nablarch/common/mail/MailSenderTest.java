@@ -108,6 +108,7 @@ public class MailSenderTest extends MailTestSupport {
      * @throws Exception
      */
     @Test
+    @TargetDb(exclude = TargetDb.Db.SQL_SERVER)
     public void testExecuteNormalEnd1() throws Exception {
 
         // データ準備
