@@ -14,11 +14,11 @@ public class MailConfig {
     private String mailRequestSbnId;
 
     /** メール送信区分(TO) */
-    private String recipientTypeTO = "1";
+    private String recipientTypeTO = "0";
     /** メール送信区分(CC) */
-    private String recipientTypeCC = "2";
+    private String recipientTypeCC = "1";
     /** メール送信区分(BCC) */
-    private String recipientTypeBCC = "3";
+    private String recipientTypeBCC = "2";
 
     /** メール送信ステータス（未送信） */
     private String statusUnsent = "0";
