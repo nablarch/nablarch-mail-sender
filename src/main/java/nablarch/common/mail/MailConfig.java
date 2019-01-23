@@ -25,7 +25,7 @@ public class MailConfig {
     /** メール送信ステータス（送信済） */
     private String statusSent = "1";
     /** メール送信ステータス（送信失敗） */
-    private String statusFailure = "9";
+    private String statusFailure = "2";
 
     /** メール送信要求件数出力時のメッセージID */
     private String mailRequestCountMessageId;
