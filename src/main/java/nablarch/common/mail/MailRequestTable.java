@@ -374,11 +374,10 @@ public class MailRequestTable implements Initializable {
                 @Override
                 public Void execute(AppDbConnection appDbConnection) {
                     SqlPStatement statement = appDbConnection.prepareStatement(updateSendProcessIdSql);
-                    int paramPosition = 1;
-                    statement.setString(paramPosition++, sendProcessId);
-                    statement.setString(paramPosition++, mailConfig.getStatusUnsent());
+                    statement.setString(1, sendProcessId);
+                    statement.setString(2, mailConfig.getStatusUnsent());
                     if (StringUtil.hasValue(mailSendPatternId)) {
-                        statement.setString(paramPosition++, mailSendPatternId);
+                        statement.setString(3, mailSendPatternId);
                     }
                     statement.executeUpdate();
                     return null;
