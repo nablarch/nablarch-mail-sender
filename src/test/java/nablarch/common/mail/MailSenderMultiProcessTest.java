@@ -261,10 +261,10 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
 		VariousDbTestHelper.setUpTable(
                 new MailRequestPatternMultiProcess(mailRequestId1, subject, from, replyTo, returnPath, charset,
                         mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, targetMailSendPatternId, null),
-                new MailRequestPatternMultiProcess(mailRequestId2, subject, from, replyTo, returnPath, charset, mailConfig.getStatusUnsent(),
-                        SystemTimeUtil.getTimestamp(), null, mailBody, nonTargetMailSendPatternId, null),
-                new MailRequestPatternMultiProcess(mailRequestId3, subject, from, replyTo, returnPath, charset, mailConfig.getStatusUnsent(),
-                        SystemTimeUtil.getTimestamp(), null, mailBody, targetMailSendPatternId, otherProcessId));
+                new MailRequestPatternMultiProcess(mailRequestId2, subject, from, replyTo, returnPath, charset,
+                		mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, nonTargetMailSendPatternId, null),
+                new MailRequestPatternMultiProcess(mailRequestId3, subject, from, replyTo, returnPath, charset,
+                		mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, targetMailSendPatternId, otherProcessId));
 
         VariousDbTestHelper.setUpTable(
                 new MailRecipient(mailRequestId1, 1L, mailConfig.getRecipientTypeCC(), cc1),
