@@ -253,12 +253,12 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         String mailRequestId1 = "1";
         String mailRequestId2 = "2";
         String mailRequestId3 = "3";
-		String nonTargetMailSendPatternId = "01";
+        String nonTargetMailSendPatternId = "01";
         String targetMailSendPatternId = "02";
         String otherProcessId = UUID.randomUUID().toString();
         String subject = "正常系1";
 
-		VariousDbTestHelper.setUpTable(
+        VariousDbTestHelper.setUpTable(
                 new MailRequestPatternMultiProcess(mailRequestId1, subject, from, replyTo, returnPath, charset,
                         mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, targetMailSendPatternId, null),
                 new MailRequestPatternMultiProcess(mailRequestId2, subject, from, replyTo, returnPath, charset,
