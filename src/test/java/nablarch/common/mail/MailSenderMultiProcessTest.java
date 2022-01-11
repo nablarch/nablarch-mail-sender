@@ -240,9 +240,8 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
      * 処理が正常終了する場合のテスト<br/>
      * パターンIDの設定とマルチプロセスの設定どちらもされていても正常に送信できる。
      * <br/>
-     * このテストケースではパターンID=01、パターンID=02の２つのメールバッチを実行する。<br>
-     * メールリクエストはそれぞれのパターンIDのものを１件づつ、ダミーのプロセスIDが付与されたものを１件登録する。<br>
-     * それぞれのメールバッチがパターンIDを認識して自身が処理すべきリクエストを処理できているかを検証する。<br>
+     * メールリクエストは対象となるパターンIDのほか、対象外ものも１件づつ、ダミーのプロセスIDが付与されたものを１件登録する。<br>
+     * メールバッチがパターンIDを認識して自身が処理すべきリクエストを処理できているかを検証する。<br>
      * ダミーのプロセスIDが付与されたものは処理されないことも検証する。<br>
      * TO:0件,CC:複数,BCC1件,添付ファイルなし
      *
@@ -256,40 +255,32 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         String mailRequestId2 = "2";
         String mailRequestId3 = "3";
 
-        String subject1 = "正常系1";
-        String subject2 = "正常系2";
-        String subject3 = "正常系3";
+        String subject = "正常系1";
 
-        String mailBody1 = "本文1";
-        String mailBody2 = "本文2";
-        String mailBody3 = "本文3";
 
         String dummyProcessID3 = "dummyProcessID3";
 
 
         VariousDbTestHelper.setUpTable(
-                new MailRequestPatternMultiProcess(mailRequestId1, subject1, from, replyTo, returnPath, charset,
-                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody1, "02", null),
-                new MailRequestPatternMultiProcess(mailRequestId2, subject2, from, replyTo, returnPath, charset, mailConfig.getStatusUnsent(),
-                        SystemTimeUtil.getTimestamp(), null, mailBody2, "01", null),
-                new MailRequestPatternMultiProcess(mailRequestId3, subject3, from, replyTo, returnPath, charset, mailConfig.getStatusUnsent(),
-                        SystemTimeUtil.getTimestamp(), null, mailBody3, "02", dummyProcessID3));
+                new MailRequestPatternMultiProcess(mailRequestId1, subject, from, replyTo, returnPath, charset,
+                        mailConfig.getStatusUnsent(), SystemTimeUtil.getTimestamp(), null, mailBody, "02", null),
+                new MailRequestPatternMultiProcess(mailRequestId2, subject, from, replyTo, returnPath, charset, mailConfig.getStatusUnsent(),
+                        SystemTimeUtil.getTimestamp(), null, mailBody, "01", null),
+                new MailRequestPatternMultiProcess(mailRequestId3, subject, from, replyTo, returnPath, charset, mailConfig.getStatusUnsent(),
+                        SystemTimeUtil.getTimestamp(), null, mailBody, "02", dummyProcessID3));
 
         VariousDbTestHelper.setUpTable(
                 new MailRecipient(mailRequestId1, 1L, mailConfig.getRecipientTypeCC(), cc1),
                 new MailRecipient(mailRequestId1, 2L, mailConfig.getRecipientTypeCC(), cc2),
                 new MailRecipient(mailRequestId1, 3L, mailConfig.getRecipientTypeCC(), cc3),
-                new MailRecipient(mailRequestId1, 4L, mailConfig.getRecipientTypeBCC(), bcc1),
-                new MailRecipient(mailRequestId2, 1L, mailConfig.getRecipientTypeCC(), cc1),
-                new MailRecipient(mailRequestId2, 2L, mailConfig.getRecipientTypeCC(), cc2),
-                new MailRecipient(mailRequestId2, 4L, mailConfig.getRecipientTypeBCC(), bcc2));
+                new MailRecipient(mailRequestId1, 4L, mailConfig.getRecipientTypeBCC(), bcc1));
 
-        // 1回目のメール送信処理：パターンID=02だけ処理
-        CommandLine commandLine1 = new CommandLine("-diConfig",
+        // メール送信処理：パターンID=02だけ処理
+        CommandLine commandLine = new CommandLine("-diConfig",
                 "nablarch/common/mail/MailSenderTestPatternIdAndMultiProcess.xml", "-requestPath",
                 "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge", "-mailSendPatternId", "02");
-        int execute1 = Main.execute(commandLine1);
-        assertThat("正常終了なので戻り値は0となる。", execute1, CoreMatchers.is(0));
+        int execute = Main.execute(commandLine);
+        assertThat("正常終了なので戻り値は0となる。", execute, CoreMatchers.is(0));
 
         // ログ出力確認
         assertLog("メール送信要求が 1 件あります。");
@@ -299,7 +290,6 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         assertThat("プロセスIDが更新されているはず", VariousDbTestHelper.findById(MailRequestPatternMultiProcess.class, mailRequestId1).processId, is(notNullValue()));
         assertThat("プロセスIDが更新されていないはず", VariousDbTestHelper.findById(MailRequestPatternMultiProcess.class, mailRequestId2).processId,is(nullValue()));
         assertThat("プロセスIDが更新されていないはず", VariousDbTestHelper.findById(MailRequestPatternMultiProcess.class, mailRequestId3).processId,is(dummyProcessID3));
-        String savedProcessId1 =VariousDbTestHelper.findById(MailRequestPatternMultiProcess.class, mailRequestId1).processId; //１回目のメール送信処理でmailRequestId1に割り当てられたプロセスID
 
 
         // bcc1でメールを受信
@@ -342,13 +332,13 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         assertThat("RetrunPathアドレス", messageReturnPath[0], is("<" + returnPath + ">"));
 
         String messageSubject = message.getSubject();
-        assertThat("件名", messageSubject, is(subject1));
+        assertThat("件名", messageSubject, is(subject));
 
         assertThat("Content-Type", message.getContentType(), containsString("text/plain"));
         assertThat("charset", message.getContentType(), containsString(charset));
 
         assertThat("添付ファイルなしなので", message.getContent(), is(instanceOf(String.class)));
-        assertThat("本文", (String) message.getContent(), is(mailBody1));
+        assertThat("本文", (String) message.getContent(), is(mailBody));
 
         // DBの検証（ステータスと送信日時）
         List<MailRequestPatternMultiProcess> mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPatternMultiProcess.class,
@@ -370,90 +360,6 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         assertThat("ステータスが更新されてないはず", mailRequestPatternList.get(2).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されてないはず", mailRequestPatternList.get(2).sendDatetime, is(nullValue()));
 
-
-        // 2回目のメール送信処理：パターンID=01だけ処理
-        CommandLine commandLine2 = new CommandLine("-diConfig",
-                "nablarch/common/mail/MailSenderTestPatternIdAndMultiProcess.xml", "-requestPath",
-                "nablarch.common.mail.MailSender/SENDMAIL00", "-userId", "hoge", "-mailSendPatternId", "01");
-        int execute2 = Main.execute(commandLine2);
-        assertThat("正常終了なので戻り値は0となる。", execute2, CoreMatchers.is(0));
-
-        // ログ出力確認
-        assertLog("メール送信要求が 1 件あります。");
-        assertLog("メールを送信しました。 mailRequestId=[" + mailRequestId2 + "]");
-
-        // 処理対象となるmailRequestId2はプロセスIDが更新され、それ以外は変わっていないことを確認
-        assertThat("プロセスIDが更新されていないはず", VariousDbTestHelper.findById(MailRequestPatternMultiProcess.class, mailRequestId1).processId, is(savedProcessId1));
-        assertThat("プロセスIDが更新されているはず", VariousDbTestHelper.findById(MailRequestPatternMultiProcess.class, mailRequestId2).processId,is(notNullValue()));
-        assertThat("プロセスIDが更新されていないはず", VariousDbTestHelper.findById(MailRequestPatternMultiProcess.class, mailRequestId3).processId,is(dummyProcessID3));
-
-
-        // bcc2でメールを受信
-        session = Session.getInstance(sessionProperties, new Authenticator() {
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication("bcc2", "default");
-            }
-        });
-        session.setDebug(true);
-
-        store = session.getStore("pop3");
-        store.connect();
-        folder = openFolder(store);
-        messages = folder.getMessages();
-        assertThat("メールが1通とどいているはず", messages.length, is(1));
-
-        // メールの検証
-        message = messages[0];
-        messageFrom = message.getFrom();
-        assertThat("fromアドレスの数", messageFrom.length, is(1));
-        assertThat("fromアドレス", ((InternetAddress) messageFrom[0]).getAddress(), is(from));
-
-        messageTO = message.getRecipients(RecipientType.TO);
-        assertNull("TOアドレス", messageTO);
-
-        messageCC = message.getRecipients(RecipientType.CC);
-        assertThat("CCアドレスの数", messageCC.length, is(2));
-        assertThat("CCアドレス1", ((InternetAddress) messageCC[0]).getAddress(), is(cc1));
-        assertThat("CCアドレス2", ((InternetAddress) messageCC[1]).getAddress(), is(cc2));
-
-        // BCCはアサートできない
-
-        messageReplyTo = message.getReplyTo();
-        assertThat("ReplyToの数", messageReplyTo.length, is(1));
-        assertThat("ReplyToアドレス", ((InternetAddress) messageReplyTo[0]).getAddress(), is(replyTo));
-
-        messageReturnPath = message.getHeader("Return-Path");
-        assertThat("RetrunPathの数", messageReturnPath.length, is(1));
-        assertThat("RetrunPathアドレス", messageReturnPath[0], is("<" + returnPath + ">"));
-
-        messageSubject = message.getSubject();
-        assertThat("件名", messageSubject, is(subject2));
-
-        assertThat("Content-Type", message.getContentType(), containsString("text/plain"));
-        assertThat("charset", message.getContentType(), containsString(charset));
-
-        assertThat("添付ファイルなしなので", message.getContent(), is(instanceOf(String.class)));
-        assertThat("本文", (String) message.getContent(), is(mailBody2));
-
-        // DBの検証（ステータスと送信日時）
-        mailRequestPatternList = VariousDbTestHelper.findAll(MailRequestPatternMultiProcess.class,
-                "mailRequestId");
-        assertThat("レコード取得数", mailRequestPatternList.size(), is(3));
-
-        //----------------------------------------------------------------------
-        // 送信対象のパターンID
-        //----------------------------------------------------------------------
-        assertThat("ステータスが更新されているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusSent()));
-        assertThat("送信日時が登録されているはず", mailRequestPatternList.get(0).sendDatetime, is(notNullValue()));
-
-        assertThat("ステータスが更新されているはず", mailRequestPatternList.get(1).status, is(mailConfig.getStatusSent()));
-        assertThat("送信日時が登録されているはず", mailRequestPatternList.get(1).sendDatetime, is(notNullValue()));
-
-        //----------------------------------------------------------------------
-        // 送信対象外のパターンID / 別プロセス処理中
-        //----------------------------------------------------------------------
-        assertThat("ステータスが更新されてないはず", mailRequestPatternList.get(2).status, is(mailConfig.getStatusUnsent()));
-        assertThat("送信日時が登録されてないはず", mailRequestPatternList.get(2).sendDatetime, is(nullValue()));
 
     }
 
