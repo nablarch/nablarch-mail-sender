@@ -255,9 +255,8 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         String mailRequestId3 = "3";
 		String nonTargetMailSendPatternId = "01";
         String targetMailSendPatternId = "02";
-        String dummyProcessID = UUID.randomUUID().toString();
+        String otherProcessId = UUID.randomUUID().toString();
         String subject = "正常系1";
-
 
 		VariousDbTestHelper.setUpTable(
                 new MailRequestPatternMultiProcess(mailRequestId1, subject, from, replyTo, returnPath, charset,
@@ -265,7 +264,7 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
                 new MailRequestPatternMultiProcess(mailRequestId2, subject, from, replyTo, returnPath, charset, mailConfig.getStatusUnsent(),
                         SystemTimeUtil.getTimestamp(), null, mailBody, nonTargetMailSendPatternId, null),
                 new MailRequestPatternMultiProcess(mailRequestId3, subject, from, replyTo, returnPath, charset, mailConfig.getStatusUnsent(),
-                        SystemTimeUtil.getTimestamp(), null, mailBody, targetMailSendPatternId, dummyProcessID));
+                        SystemTimeUtil.getTimestamp(), null, mailBody, targetMailSendPatternId, otherProcessId));
 
         VariousDbTestHelper.setUpTable(
                 new MailRecipient(mailRequestId1, 1L, mailConfig.getRecipientTypeCC(), cc1),
@@ -283,11 +282,6 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         // ログ出力確認
         assertLog("メール送信要求が 1 件あります。");
         assertLog("メールを送信しました。 mailRequestId=[" + mailRequestId1 + "]");
-
-        // 処理対象となるmailRequestId1はプロセスIDが更新され、それ以外は変わっていないことを確認
-        assertThat("プロセスIDが更新されているはず", VariousDbTestHelper.findById(MailRequestPatternMultiProcess.class, mailRequestId1).processId, is(notNullValue()));
-        assertThat("プロセスIDが更新されていないはず", VariousDbTestHelper.findById(MailRequestPatternMultiProcess.class, mailRequestId2).processId,is(nullValue()));
-        assertThat("プロセスIDが更新されていないはず", VariousDbTestHelper.findById(MailRequestPatternMultiProcess.class, mailRequestId3).processId,is(dummyProcessID));
 
         // bcc1でメールを受信
         Session session = Session.getInstance(sessionProperties, new Authenticator() {
@@ -347,15 +341,18 @@ public class MailSenderMultiProcessTest extends MailTestSupport {
         //----------------------------------------------------------------------
         assertThat("ステータスが更新されているはず", mailRequestPatternList.get(0).status, is(mailConfig.getStatusSent()));
         assertThat("送信日時が登録されているはず", mailRequestPatternList.get(0).sendDatetime, is(notNullValue()));
+        assertThat("プロセスIDが更新されているはず", mailRequestPatternList.get(0).processId, is(notNullValue()));
 
         //----------------------------------------------------------------------
         // 送信対象外のパターンID / 別プロセス処理中
         //----------------------------------------------------------------------
         assertThat("ステータスが更新されてないはず", mailRequestPatternList.get(1).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されてないはず", mailRequestPatternList.get(1).sendDatetime, is(nullValue()));
+        assertThat("プロセスIDが更新されていないはず", mailRequestPatternList.get(1).processId,is(nullValue()));
 
         assertThat("ステータスが更新されてないはず", mailRequestPatternList.get(2).status, is(mailConfig.getStatusUnsent()));
         assertThat("送信日時が登録されてないはず", mailRequestPatternList.get(2).sendDatetime, is(nullValue()));
+        assertThat("プロセスIDが更新されていないはず", mailRequestPatternList.get(2).processId,is(otherProcessId));
     }
 
     /**
