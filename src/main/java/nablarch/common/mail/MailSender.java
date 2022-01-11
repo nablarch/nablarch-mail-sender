@@ -438,7 +438,7 @@ public class MailSender extends BatchAction<SqlRow> {
         MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
         MailConfig mailConfig = SystemRepository.get("mailConfig");
 
-        String mailSendPatternId = ctx.getSessionScopedVar("mailSendPatternId");
+        final String mailSendPatternId = ctx.getSessionScopedVar("mailSendPatternId");
 
         int unsentRecordCount = mailRequestTable.getTargetCount(mailSendPatternId);
 
@@ -451,7 +451,7 @@ public class MailSender extends BatchAction<SqlRow> {
             @Override
             public void beforeReadRecords() {
                 final MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
-                mailRequestTable.updateSendProcessId(processId);
+                mailRequestTable.updateSendProcessId(mailSendPatternId, processId);
             }
         });
         return reader;

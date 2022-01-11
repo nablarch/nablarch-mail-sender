@@ -364,9 +364,10 @@ public class MailRequestTable implements Initializable {
      * マルチプロセス用の設定がされている場合のみ更新し、
      * 別トランザクションで実行する。
      *
+     * @param mailSendPatternId メール送信パターンID
      * @param sendProcessId 更新するメール送信バッチのプロセスID
      */
-    public void updateSendProcessId(final String sendProcessId) {
+    public void updateSendProcessId(final String mailSendPatternId, final String sendProcessId) {
         if (StringUtil.hasValue(sendProcessIdColumnName)) {
             SimpleDbTransactionManager manager = SystemRepository.get("mailMultiProcessTransaction");
             new SimpleDbTransactionExecutor<Void>(manager) {
@@ -375,6 +376,9 @@ public class MailRequestTable implements Initializable {
                     SqlPStatement statement = appDbConnection.prepareStatement(updateSendProcessIdSql);
                     statement.setString(1, sendProcessId);
                     statement.setString(2, mailConfig.getStatusUnsent());
+                    if (StringUtil.hasValue(mailSendPatternId)) {
+                        statement.setString(3, mailSendPatternId);
+                    }
                     statement.executeUpdate();
                     return null;
                 }
@@ -511,8 +515,11 @@ public class MailRequestTable implements Initializable {
     private String createUpdateSendProcessIdSql() {
         String update = "UPDATE " + tableName
                 + " SET " + sendProcessIdColumnName + " = ?"
-                + " WHERE " + statusColumnName + " = ? "
-                + " AND " + sendProcessIdColumnName + " IS NULL ";
+                + " WHERE " + statusColumnName + " = ? ";
+		if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
+			update += "AND " + mailSendPatternIdColumnName + " = ? ";
+		}
+		update += " AND " + sendProcessIdColumnName + " IS NULL ";
         return update;
     }
 
