@@ -21,25 +21,25 @@ import nablarch.core.util.annotation.Published;
 @Published(tag = "architect")
 public class MailRequestTable implements Initializable {
 
-	/** SQLリテラル */
+    /** SQLリテラル */
     private static final String SELECT = "SELECT ";
-	/** SQLリテラル */
+    /** SQLリテラル */
     private static final String FROM = " FROM ";
-	/** SQLリテラル */
+    /** SQLリテラル */
     private static final String WHERE = " WHERE ";
-	/** SQLリテラル */
+    /** SQLリテラル */
     private static final String AND = " AND ";
-	/** SQLリテラル */
+    /** SQLリテラル */
     private static final String UPDATE = "UPDATE ";
-	/** SQLリテラル */
+    /** SQLリテラル */
     private static final String SET = " SET ";
-	/** SQLリテラル */
+    /** SQLリテラル */
     private static final String ORDER_BY = " ORDER BY ";
-	/** SQLリテラル */
+    /** SQLリテラル */
     private static final String BIND_PARAMETER = " = ? ";
-	/** SQLリテラル */
+    /** SQLリテラル */
     private static final String INSERT_INTO = "INSERT INTO ";
-	/** SQLリテラル */
+    /** SQLリテラル */
     private static final String VALUES = " values ";
 
 
@@ -537,10 +537,10 @@ public class MailRequestTable implements Initializable {
         String update = UPDATE + tableName
                 + SET + sendProcessIdColumnName + BIND_PARAMETER
                 + WHERE + statusColumnName + BIND_PARAMETER;
-		if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
-			update += AND + mailSendPatternIdColumnName + BIND_PARAMETER;
-		}
-		update += AND + sendProcessIdColumnName + " IS NULL ";
+        if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
+            update += AND + mailSendPatternIdColumnName + BIND_PARAMETER;
+        }
+        update += AND + sendProcessIdColumnName + " IS NULL ";
         return update;
     }
 

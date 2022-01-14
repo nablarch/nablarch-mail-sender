@@ -42,22 +42,22 @@ import nablarch.fw.results.TransactionAbnormalEnd;
  */
 public class MailSender extends BatchAction<SqlRow> {
 
-	/** システムリポジトリ用のキー定数 */
+    /** システムリポジトリ用のキー定数 */
     private static final String SYSTEM_REPOSITORY_KEY_MAIL_CONFIG = "mailConfig";
 
-	/** システムリポジトリ用のキー定数 */
-	private static final String SYSTEM_REPOSITORY_KEY_MAIL_SESSION_CONFIG = "mailSessionConfig";
+    /** システムリポジトリ用のキー定数 */
+    private static final String SYSTEM_REPOSITORY_KEY_MAIL_SESSION_CONFIG = "mailSessionConfig";
 
-	/** システムリポジトリ用のキー定数 */
-	private static final String SYSTEM_REPOSITORY_KEY_MAIL_ATTACHED_FILE_TABLE = "mailAttachedFileTable";
+    /** システムリポジトリ用のキー定数 */
+    private static final String SYSTEM_REPOSITORY_KEY_MAIL_ATTACHED_FILE_TABLE = "mailAttachedFileTable";
 
-	/** システムリポジトリ用のキー定数 */
-	private static final String SYSTEM_REPOSITORY_KEY_MAIL_RECIPIENT_TABLE = "mailRecipientTable";
+    /** システムリポジトリ用のキー定数 */
+    private static final String SYSTEM_REPOSITORY_KEY_MAIL_RECIPIENT_TABLE = "mailRecipientTable";
 
-	/** システムリポジトリ用のキー定数 */
-	private static final String SYSTEM_REPOSITORY_KEY_MAIL_REQUEST_TABLE = "mailRequestTable";
+    /** システムリポジトリ用のキー定数 */
+    private static final String SYSTEM_REPOSITORY_KEY_MAIL_REQUEST_TABLE = "mailRequestTable";
 
-	/** メール送信バッチを識別するプロセスID */
+    /** メール送信バッチを識別するプロセスID */
     private final String processId = UUID.randomUUID().toString();
 
     /** ロガー */
@@ -68,7 +68,7 @@ public class MailSender extends BatchAction<SqlRow> {
      */
     @Published(tag = "architect")
     public MailSender() {
-    	// Do nothing
+        // Do nothing
     }
 
     /**
