@@ -405,13 +405,24 @@ public class MailRequestTable implements Initializable {
         updateSendProcessIdSql = createUpdateSendProcessIdSql();
     }
 
+    private static final String SELECT = "SELECT ";
+    private static final String FROM = " FROM ";
+    private static final String WHERE = " WHERE ";
+    private static final String AND = " AND ";
+    private static final String UPDATE = "UPDATE ";
+    private static final String SET = " SET ";
+    private static final String ORDER_BY = " ORDER BY ";
+    private static final String BIND_PARAMETER = " = ?";
+    private static final String INSERT_INTO = "INSERT INTO ";
+    private static final String VALUES = "values";
+
     /**
      * 未処理データを取得するためのSELECT文を生成する。
      *
      * @return 未処理データを取得するためのSQL文
      */
     private String createSelectUnsentSql() {
-        String sql = "SELECT "
+        String sql = SELECT
                 + mailRequestIdColumnName + " MAIL_REQUEST_ID, "
                 + subjectColumnName + " SUBJECT, "
                 + fromColumnName + " FROM_ADDRESS, "
@@ -419,16 +430,15 @@ public class MailRequestTable implements Initializable {
                 + returnPathColumnName + " RETURN_PATH, "
                 + mailBodyColumnName + " MAIL_BODY, "
                 + charsetColumnName + " CHARSET "
-                + "FROM " + tableName
-                + " WHERE " + statusColumnName + " = ? ";
-
+                + FROM + tableName
+                + WHERE + statusColumnName + BIND_PARAMETER;
         if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
-            sql += "AND " + mailSendPatternIdColumnName + " = ? ";
+            sql += AND + mailSendPatternIdColumnName + BIND_PARAMETER;
         }
         if (StringUtil.hasValue(sendProcessIdColumnName)) {
-            sql += "AND " + sendProcessIdColumnName + " = ? ";
+            sql += AND + sendProcessIdColumnName + BIND_PARAMETER;
         }
-        sql += "ORDER BY " + mailRequestIdColumnName;
+        sql += ORDER_BY + mailRequestIdColumnName;
         return sql;
     }
 
@@ -438,16 +448,15 @@ public class MailRequestTable implements Initializable {
      * @return 生成したSELECT文
      */
     private String createCountUnsentSql() {
-        String sql = "SELECT COUNT(*) AS COUNT "
-                + "FROM "
-                + tableName
-                + " WHERE "
-                + statusColumnName + " = ? ";
+        String sql = SELECT
+                +"COUNT(*) AS COUNT "
+                + FROM + tableName
+                + WHERE + statusColumnName + BIND_PARAMETER;
         if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
-            sql += "AND " + mailSendPatternIdColumnName + " = ? ";
+            sql += AND + mailSendPatternIdColumnName + BIND_PARAMETER;
         }
         if (StringUtil.hasValue(sendProcessIdColumnName)) {
-            sql += "AND " + sendProcessIdColumnName + " IS NULL ";
+            sql += AND + sendProcessIdColumnName + " IS NULL ";
         }
         return sql;
     }
@@ -458,12 +467,12 @@ public class MailRequestTable implements Initializable {
      * @return ステータスと送信日時を更新するSQL文
      */
     private String createUpdateStatus() {
-        return "UPDATE " + tableName
-                + " SET "
-                + statusColumnName + " = ?, "
-                + sendDateTimeColumnName + " = ? "
-                + " WHERE " + mailRequestIdColumnName + " = ?"
-                + " AND " + statusColumnName + " = ?";
+        return UPDATE + tableName
+                + SET
+                + statusColumnName + BIND_PARAMETER + ", "
+                + sendDateTimeColumnName + BIND_PARAMETER
+                + WHERE + mailRequestIdColumnName + BIND_PARAMETER
+                + AND + statusColumnName + BIND_PARAMETER;
     }
 
     /**
@@ -474,12 +483,12 @@ public class MailRequestTable implements Initializable {
      * @return ステータスを更新する（障害用）SQL文
      */
     private String createUpdateFailureStatusSql() {
-        return "UPDATE " + tableName
-                + " SET "
-                + statusColumnName + " = ?, "
+        return UPDATE + tableName
+                + SET
+                + statusColumnName + BIND_PARAMETER + ", "
                 + sendDateTimeColumnName + " = null "
-                + "WHERE " + mailRequestIdColumnName + " = ?"
-                + " AND " + statusColumnName + " = ?";
+                + WHERE + mailRequestIdColumnName + BIND_PARAMETER
+                + AND + statusColumnName + BIND_PARAMETER;
     }
 
     /**
@@ -488,7 +497,7 @@ public class MailRequestTable implements Initializable {
      * @return 生成したINSERT文
      */
     private String createInsertSql() {
-        String insert = "INSERT INTO " + tableName + " ("
+        String insert = INSERT_INTO + tableName + " ("
                 + mailRequestIdColumnName + ", "
                 + subjectColumnName + ", "
                 + fromColumnName + ", "
@@ -504,7 +513,7 @@ public class MailRequestTable implements Initializable {
             insert += ", " + mailSendPatternIdColumnName;
             values += ",?";
         }
-        return insert + ") values (" + values + ')';
+        return insert + ") "+ VALUES +" (" + values + ')';
     }
 
     /**
@@ -513,13 +522,13 @@ public class MailRequestTable implements Initializable {
      * @return 未処理データのメール送信バッチのプロセスIDを更新するSQL
      */
     private String createUpdateSendProcessIdSql() {
-        String update = "UPDATE " + tableName
-                + " SET " + sendProcessIdColumnName + " = ?"
-                + " WHERE " + statusColumnName + " = ? ";
+        String update = UPDATE + tableName
+                + SET + sendProcessIdColumnName + BIND_PARAMETER
+                + WHERE + statusColumnName + BIND_PARAMETER;
 		if (StringUtil.hasValue(mailSendPatternIdColumnName)) {
-			update += "AND " + mailSendPatternIdColumnName + " = ? ";
+			update += AND + mailSendPatternIdColumnName + BIND_PARAMETER;
 		}
-		update += " AND " + sendProcessIdColumnName + " IS NULL ";
+		update += AND + sendProcessIdColumnName + " IS NULL ";
         return update;
     }
 
