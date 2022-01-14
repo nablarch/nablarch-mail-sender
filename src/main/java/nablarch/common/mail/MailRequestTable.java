@@ -40,7 +40,7 @@ public class MailRequestTable implements Initializable {
     /** SQLリテラル */
     private static final String INSERT_INTO = "INSERT INTO ";
     /** SQLリテラル */
-    private static final String VALUES = " values ";
+    private static final String VALUES = " VALUES ";
 
 
     /** テーブル名 */
@@ -498,7 +498,7 @@ public class MailRequestTable implements Initializable {
         return UPDATE + tableName
                 + SET
                 + statusColumnName + BIND_PARAMETER + ", "
-                + sendDateTimeColumnName + " = null "
+                + sendDateTimeColumnName + " = NULL "
                 + WHERE + mailRequestIdColumnName + BIND_PARAMETER
                 + AND + statusColumnName + BIND_PARAMETER;
     }
