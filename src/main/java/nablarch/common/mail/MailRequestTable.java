@@ -21,6 +21,28 @@ import nablarch.core.util.annotation.Published;
 @Published(tag = "architect")
 public class MailRequestTable implements Initializable {
 
+	/** SQLリテラル */
+    private static final String SELECT = "SELECT ";
+	/** SQLリテラル */
+    private static final String FROM = " FROM ";
+	/** SQLリテラル */
+    private static final String WHERE = " WHERE ";
+	/** SQLリテラル */
+    private static final String AND = " AND ";
+	/** SQLリテラル */
+    private static final String UPDATE = "UPDATE ";
+	/** SQLリテラル */
+    private static final String SET = " SET ";
+	/** SQLリテラル */
+    private static final String ORDER_BY = " ORDER BY ";
+	/** SQLリテラル */
+    private static final String BIND_PARAMETER = " = ? ";
+	/** SQLリテラル */
+    private static final String INSERT_INTO = "INSERT INTO ";
+	/** SQLリテラル */
+    private static final String VALUES = " values ";
+
+
     /** テーブル名 */
     private String tableName;
 
@@ -304,7 +326,7 @@ public class MailRequestTable implements Initializable {
         }
         if (StringUtil.hasValue(sendProcessIdColumnName)) {
             if (StringUtil.hasValue(sendProcessId)) {
-                statement.setString(paramPosition++, sendProcessId);
+                statement.setString(paramPosition, sendProcessId);
             } else {
                 throw new IllegalArgumentException("sendProcessId must not be null if you use in multi process.");
             }
@@ -405,16 +427,6 @@ public class MailRequestTable implements Initializable {
         updateSendProcessIdSql = createUpdateSendProcessIdSql();
     }
 
-    private static final String SELECT = "SELECT ";
-    private static final String FROM = " FROM ";
-    private static final String WHERE = " WHERE ";
-    private static final String AND = " AND ";
-    private static final String UPDATE = "UPDATE ";
-    private static final String SET = " SET ";
-    private static final String ORDER_BY = " ORDER BY ";
-    private static final String BIND_PARAMETER = " = ?";
-    private static final String INSERT_INTO = "INSERT INTO ";
-    private static final String VALUES = "values";
 
     /**
      * 未処理データを取得するためのSELECT文を生成する。
@@ -513,7 +525,7 @@ public class MailRequestTable implements Initializable {
             insert += ", " + mailSendPatternIdColumnName;
             values += ",?";
         }
-        return insert + ") "+ VALUES +" (" + values + ')';
+        return insert + ")"+ VALUES +" (" + values + ')';
     }
 
     /**
