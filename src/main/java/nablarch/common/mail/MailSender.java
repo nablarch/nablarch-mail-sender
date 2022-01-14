@@ -42,6 +42,21 @@ import nablarch.fw.results.TransactionAbnormalEnd;
  */
 public class MailSender extends BatchAction<SqlRow> {
 
+    /** システムリポジトリ用のキー定数 */
+    private static final String SYSTEM_REPOSITORY_KEY_MAIL_CONFIG = "mailConfig";
+
+    /** システムリポジトリ用のキー定数 */
+    private static final String SYSTEM_REPOSITORY_KEY_MAIL_SESSION_CONFIG = "mailSessionConfig";
+
+    /** システムリポジトリ用のキー定数 */
+    private static final String SYSTEM_REPOSITORY_KEY_MAIL_ATTACHED_FILE_TABLE = "mailAttachedFileTable";
+
+    /** システムリポジトリ用のキー定数 */
+    private static final String SYSTEM_REPOSITORY_KEY_MAIL_RECIPIENT_TABLE = "mailRecipientTable";
+
+    /** システムリポジトリ用のキー定数 */
+    private static final String SYSTEM_REPOSITORY_KEY_MAIL_REQUEST_TABLE = "mailRequestTable";
+
     /** メール送信バッチを識別するプロセスID */
     private final String processId = UUID.randomUUID().toString();
 
@@ -53,6 +68,7 @@ public class MailSender extends BatchAction<SqlRow> {
      */
     @Published(tag = "architect")
     public MailSender() {
+        // Do nothing
     }
 
     /**
@@ -65,10 +81,10 @@ public class MailSender extends BatchAction<SqlRow> {
     public Result handle(SqlRow data, ExecutionContext context) {
 
         // テーブルスキーマ情報の取得
-        MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
-        MailRecipientTable mailRecipientTable = SystemRepository.get("mailRecipientTable");
-        MailAttachedFileTable mailAttachedFileTable = SystemRepository.get("mailAttachedFileTable");
-        MailSessionConfig mailSenderConfig = SystemRepository.get("mailSessionConfig");
+        MailRequestTable mailRequestTable = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_REQUEST_TABLE);
+        MailRecipientTable mailRecipientTable = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_RECIPIENT_TABLE);
+        MailAttachedFileTable mailAttachedFileTable = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_ATTACHED_FILE_TABLE);
+        MailSessionConfig mailSenderConfig = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_SESSION_CONFIG);
 
         MailRequestTable.MailRequest mailRequest = mailRequestTable.getMailRequest(data);
 
@@ -77,7 +93,7 @@ public class MailSender extends BatchAction<SqlRow> {
         // メールセッションの取得
         Session session = createMailSession(mailRequest.getReturnPath(), mailSenderConfig);
 
-        MailConfig mailConfig = SystemRepository.get("mailConfig");
+        MailConfig mailConfig = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_CONFIG);
         try {
             // 2重送信防止のため、送信ステータスをはじめに送信済みに更新する。
             updateToSuccess(data, context);
@@ -234,7 +250,7 @@ public class MailSender extends BatchAction<SqlRow> {
             MailRequestTable.MailRequest mailRequest,
             Session session, MailRecipientTable mailRecipientTable) throws MessagingException {
 
-        MailConfig mailConfig = SystemRepository.get("mailConfig");
+        MailConfig mailConfig = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_CONFIG);
 
         // エラーの発生したアドレス
         List<String> errorAddresses = new ArrayList<String>();
@@ -435,8 +451,8 @@ public class MailSender extends BatchAction<SqlRow> {
     @Published(tag = "architect")
     public DataReader<SqlRow> createReader(ExecutionContext ctx) {
 
-        MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
-        MailConfig mailConfig = SystemRepository.get("mailConfig");
+        MailRequestTable mailRequestTable = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_REQUEST_TABLE);
+        MailConfig mailConfig = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_CONFIG);
 
         final String mailSendPatternId = ctx.getSessionScopedVar("mailSendPatternId");
 
@@ -450,7 +466,7 @@ public class MailSender extends BatchAction<SqlRow> {
         reader.setListener(new DatabaseRecordListener() {
             @Override
             public void beforeReadRecords() {
-                final MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
+                final MailRequestTable mailRequestTable = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_REQUEST_TABLE);
                 mailRequestTable.updateSendProcessId(mailSendPatternId, processId);
             }
         });
@@ -467,9 +483,9 @@ public class MailSender extends BatchAction<SqlRow> {
      */
     @Published(tag = "architect")
     protected void updateToFailed(final SqlRow data, final ExecutionContext context) {
-        final MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
+        final MailRequestTable mailRequestTable = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_REQUEST_TABLE);
         final MailRequestTable.MailRequest mailRequest = mailRequestTable.getMailRequest(data);
-        final MailConfig mailConfig = SystemRepository.get("mailConfig");
+        final MailConfig mailConfig = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_CONFIG);
         try {
             mailRequestTable.updateFailureStatus(mailRequest.getMailRequestId(), mailConfig.getStatusFailure());
         } catch (RuntimeException re) {
@@ -492,9 +508,9 @@ public class MailSender extends BatchAction<SqlRow> {
      */
     @Published(tag = "architect")
     protected void updateToSuccess(final SqlRow data, final ExecutionContext context) {
-        final MailRequestTable mailRequestTable = SystemRepository.get("mailRequestTable");
+        final MailRequestTable mailRequestTable = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_REQUEST_TABLE);
         final MailRequestTable.MailRequest mailRequest = mailRequestTable.getMailRequest(data);
-        final MailConfig mailConfig = SystemRepository.get("mailConfig");
+        final MailConfig mailConfig = SystemRepository.get(SYSTEM_REPOSITORY_KEY_MAIL_CONFIG);
 
         mailRequestTable.updateStatus(mailRequest.getMailRequestId(), mailConfig.getStatusSent());
     }
