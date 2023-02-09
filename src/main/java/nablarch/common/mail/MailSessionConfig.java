@@ -25,7 +25,7 @@ public class MailSessionConfig {
     /** 送信タイムアウト値 */
     private String mailSmtpTimeout;
 
-    /** その他javax.mail.Sessionのオプション */
+    /** その他jakarta.mail.Sessionのオプション */
     private Map<String, String> option = new HashMap<String, String>();
 
     /**
@@ -124,16 +124,16 @@ public class MailSessionConfig {
     }
 
     /**
-     * javax.mail.Sessionのオプションを取得する。
+     * jakarta.mail.Sessionのオプションを取得する。
      * 
-     * @return javax.mail.Sessionのオプション
+     * @return jakarta.mail.Sessionのオプション
      */
     public Map<String, String> getOption() {
         return option;
     }
 
     /**
-     * その他のjavax.mail.Sessionのオプションを設定する。
+     * その他のjakarta.mail.Sessionのオプションを設定する。
      * 
      * @param option オプション名と値のMap
      */
