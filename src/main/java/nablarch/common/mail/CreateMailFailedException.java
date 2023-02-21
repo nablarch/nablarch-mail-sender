@@ -1,6 +1,6 @@
 package nablarch.common.mail;
 
-import javax.mail.MessagingException;
+import jakarta.mail.MessagingException;
 
 /**
  * メール作成時の失敗を表す例外。<br/>
