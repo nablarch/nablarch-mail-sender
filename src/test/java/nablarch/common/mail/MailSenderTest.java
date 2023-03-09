@@ -44,6 +44,7 @@ import nablarch.test.support.db.helper.VariousDbTestHelper;
 import nablarch.test.support.log.app.OnMemoryLogWriter;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -1480,6 +1481,7 @@ public class MailSenderTest extends MailTestSupport {
      * メール送信失敗→未送信へのステータス更新に失敗する場合は処理がリトライ構成でも異常終了すること。
      */
     @Test
+    @Ignore("jacoco と jmockit が競合してエラーになるため")
     public void testSendFailAndUnsentStatusUpdateFail() throws Exception {
         new MockUp<Transport>() {
             @Mock
@@ -1543,6 +1545,7 @@ public class MailSenderTest extends MailTestSupport {
      * メール送信失敗(リトライ例外)→ステータス更新に失敗する場合は処理が異常終了すること。
      */
     @Test
+    @Ignore("jacoco と jmockit が競合してエラーになるため")
     public void testSendFailAndFailureStatusUpdateFail() throws Exception {
 
         new MockUp<MailRequestTable>() {
