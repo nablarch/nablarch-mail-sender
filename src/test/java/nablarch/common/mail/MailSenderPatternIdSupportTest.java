@@ -40,9 +40,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import mockit.Mock;
-import mockit.MockUp;
-
 /**
  * {@link nablarch.common.mail.MailSender}のテストクラス。
  * <p/>

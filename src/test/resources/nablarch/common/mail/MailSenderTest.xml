@@ -71,6 +71,9 @@
             <property name="concurrentNumber" value="${threadCount}" />
             <property name="commitLogger" ref="commitLogger" />
         </component>
+        
+        <!-- Transportをモック化するハンドラ -->
+        <component class="nablarch.common.mail.MockTransportHandler" />
 
         <!-- データベース接続ハンドラ -->
         <component-ref name="dbConnectionManagementHandler" />

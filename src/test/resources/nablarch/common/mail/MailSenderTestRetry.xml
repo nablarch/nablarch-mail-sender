@@ -84,6 +84,11 @@
             <property name="commitLogger" ref="commitLogger" />
         </component>
 
+        <!-- Transportをモック化するハンドラ -->
+        <component class="nablarch.common.mail.MockTransportHandler" />
+        <!-- MailRequestTableをモック化するハンドラ -->
+        <component class="nablarch.common.mail.MockMailRequestTableHandler" />
+
         <!-- データベース接続ハンドラ -->
         <component-ref name="dbConnectionManagementHandler" />
 
