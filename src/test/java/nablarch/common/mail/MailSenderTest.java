@@ -1,18 +1,5 @@
 package nablarch.common.mail;
 
-import static org.hamcrest.CoreMatchers.*;
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
-
-import java.io.File;
-import java.sql.SQLException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
-
 import jakarta.mail.Address;
 import jakarta.mail.Authenticator;
 import jakarta.mail.Folder;
@@ -24,10 +11,8 @@ import jakarta.mail.PasswordAuthentication;
 import jakarta.mail.SendFailedException;
 import jakarta.mail.Session;
 import jakarta.mail.Store;
-import jakarta.mail.Transport;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage.RecipientType;
-
 import nablarch.core.date.BasicSystemTimeProvider;
 import nablarch.core.date.SystemTimeUtil;
 import nablarch.core.db.DbAccessException;
@@ -42,15 +27,29 @@ import nablarch.test.support.db.helper.DatabaseTestRunner;
 import nablarch.test.support.db.helper.TargetDb;
 import nablarch.test.support.db.helper.VariousDbTestHelper;
 import nablarch.test.support.log.app.OnMemoryLogWriter;
-
+import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import mockit.Mock;
-import mockit.MockUp;
+import java.io.File;
+import java.sql.SQLException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.CoreMatchers.nullValue;
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 
 /**
  * {@link MailSender}のテストクラス。
@@ -83,6 +82,12 @@ public class MailSenderTest extends MailTestSupport {
 
         VariousDbTestHelper.setUpTable(new MailBatchRequest("SENDMAIL00", "メール送信バッチ", "0", "0", "1"));
         OnMemoryLogWriter.clear();
+    }
+
+    @After
+    public void tearDown() {
+        MockTransportHandler.setAnswer(null);
+        MockMailRequestTableHandler.setInitializer(null);
     }
 
     public static class TestSystemTimeProvider extends BasicSystemTimeProvider {
@@ -1481,21 +1486,15 @@ public class MailSenderTest extends MailTestSupport {
      * メール送信失敗→未送信へのステータス更新に失敗する場合は処理がリトライ構成でも異常終了すること。
      */
     @Test
-    @Ignore("jacoco と jmockit が競合してエラーになるため")
     public void testSendFailAndUnsentStatusUpdateFail() throws Exception {
-        new MockUp<Transport>() {
-            @Mock
-            void send(Message message) throws MessagingException {
-                throw new MessagingException("Test MessagingException.");
-            }
-        };
-
-        new MockUp<MailRequestTable>() {
-            @Mock
-            void updateFailureStatus(final String mailRequestId, final String status) {
-                throw new DbAccessException("db error!!!!", new SQLException());
-            }
-        };
+        MockTransportHandler.setAnswer(context -> {
+            throw new MessagingException("Test MessagingException.");
+        });
+        
+        MockMailRequestTableHandler.setInitializer(mock -> {
+            doThrow(new DbAccessException("db error!!!!", new SQLException()))
+                    .when(mock).updateFailureStatus(anyString(), anyString());
+        });
 
         // データ準備
         String mailRequestId = "1";
@@ -1545,16 +1544,12 @@ public class MailSenderTest extends MailTestSupport {
      * メール送信失敗(リトライ例外)→ステータス更新に失敗する場合は処理が異常終了すること。
      */
     @Test
-    @Ignore("jacoco と jmockit が競合してエラーになるため")
     public void testSendFailAndFailureStatusUpdateFail() throws Exception {
-
-        new MockUp<MailRequestTable>() {
-            @Mock
-            void updateFailureStatus(final String mailRequestId, final String status) {
-                throw new DbAccessException("db error!!!!", new SQLException());
-            }
-        };
-
+        MockMailRequestTableHandler.setInitializer(mock -> {
+            doThrow(new DbAccessException("db error!!!!", new SQLException()))
+                    .when(mock).updateFailureStatus(anyString(), anyString());
+        });
+        
         // データ準備
         String mailRequestId = "1";
         String subject = "正常系";
@@ -1633,20 +1628,16 @@ public class MailSenderTest extends MailTestSupport {
      */
     @Test
     public void testSendFailBySendFailedException() {
-        new MockUp<Transport>() {
-
-            @Mock
-            public void send(Message message) throws MessagingException {
-                // 複数アドレスの場合、間に ", " が入る
-                final Address[] validSent = {new InternetAddress(to1), new InternetAddress(to2), new InternetAddress(cc1)};
-                // １アドレスの場合
-                final Address[] validUnsent = {new InternetAddress(to3)};
-                // 空の場合
-                final Address[] invalid = {};
-                throw new SendFailedException("Test SendFailedException message.", null,
-                        validSent, validUnsent, invalid);
-            }
-        };
+        MockTransportHandler.setAnswer(context -> {
+            // 複数アドレスの場合、間に ", " が入る
+            final Address[] validSent = {new InternetAddress(to1), new InternetAddress(to2), new InternetAddress(cc1)};
+            // １アドレスの場合
+            final Address[] validUnsent = {new InternetAddress(to3)};
+            // 空の場合
+            final Address[] invalid = {};
+            throw new SendFailedException("Test SendFailedException message.", null,
+                    validSent, validUnsent, invalid);
+        });
 
         // データ準備
         String mailRequestId = "1";
@@ -1670,7 +1661,7 @@ public class MailSenderTest extends MailTestSupport {
         OnMemoryLogWriter.assertLogContains("writer.memory",
                 "Failed to send a mail. Error message:[Test SendFailedException message.] Mail RequestId:[1] "
                         + "Sent address:[to1@localhost, to2@localhost, cc1@localhost] Unsent address:[to3@localhost] Invalid address:[]",
-                         "メール送信に失敗しました。 mailRequestId=[1]");
+                "メール送信に失敗しました。 mailRequestId=[1]");
         //障害通知ログに[1]と、メール送信失敗のアドレスの詳細が１回出力されていること
         assertLogWithCount("writer.failure-memory",
                 createMessagePattern(
@@ -1695,19 +1686,10 @@ public class MailSenderTest extends MailTestSupport {
      */
     @Test
     public void testSendFailBySendFailedExceptionNullAddresses() {
-        new MockUp<Transport>() {
-
-            @Mock
-            public void send(Message message) throws MessagingException {
-                // nullの場合
-                final Address[] validSent = null;
-                final Address[] validUnsent = null;
-                final Address[] invalid = null;
-                throw new SendFailedException("Test SendFailedException message.", null,
-                        validSent, validUnsent, invalid);
-            }
-        };
-
+        MockTransportHandler.setAnswer(context -> {
+            throw new SendFailedException("Test SendFailedException message.", null, null, null, null);
+        });
+        
         // データ準備
         String mailRequestId = "1";
         String subject = "異常系 Transport.Sendで失敗";
@@ -1756,14 +1738,9 @@ public class MailSenderTest extends MailTestSupport {
      */
     @Test
     public void testNoRetryableExceptionAndProcessAbnormalEnd() {
-
-        new MockUp<Transport>() {
-
-            @Mock
-            public void send(Message message) throws MessagingException {
-                throw new RuntimeException("Test RuntimeException message in Transport.send.");
-            }
-        };
+        MockTransportHandler.setAnswer(context -> {
+            throw new RuntimeException("Test RuntimeException message in Transport.send.");
+        });
 
         // データ準備
         String mailRequestId = "1";
@@ -1805,14 +1782,9 @@ public class MailSenderTest extends MailTestSupport {
      */
     @Test
     public void testRethrowProcessAbnormalEnd() {
-
-        new MockUp<Transport>() {
-
-            @Mock
-            public void send(Message message) throws MessagingException {
-                throw new ProcessAbnormalEnd(198,"SEND_FAIL0", "1");
-            }
-        };
+        MockTransportHandler.setAnswer(context -> {
+            throw new ProcessAbnormalEnd(198,"SEND_FAIL0", "1");
+        });
 
         // データ準備
         String mailRequestId = "1";
@@ -1856,14 +1828,9 @@ public class MailSenderTest extends MailTestSupport {
      */
     @Test
     public void testRetryableExceptionAndExceedRetryCount() throws Exception {
-
-        new MockUp<Transport>() {
-
-            @Mock
-            public void send(Message message) throws MessagingException {
-                throw new MessagingException("Test MessagingException message.");
-            }
-        };
+        MockTransportHandler.setAnswer(context -> {
+            throw new MessagingException("Test MessagingException message.");
+        });
 
         // データ準備
         String mailRequestId1 = "1";
