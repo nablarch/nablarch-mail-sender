@@ -6,7 +6,7 @@
 
   <groupId>com.nablarch.framework</groupId>
   <artifactId>nablarch-mail-sender</artifactId>
-  <version>1.4.2</version>
+  <version>2.0.0</version>
 
   <scm>
     <connection>scm:git:git://github.com/nablarch/${project.artifactId}.git</connection>
@@ -17,7 +17,7 @@
   <parent>
     <groupId>com.nablarch</groupId>
     <artifactId>nablarch-parent</artifactId>
-    <version>5u21</version>
+    <version>6</version>
   </parent>
 
   <dependencies>
@@ -33,28 +33,30 @@
     </dependency>
 
     <dependency>
-      <groupId>javax.mail</groupId>
-      <artifactId>mailapi</artifactId>
-      <version>1.4.3</version>
+      <groupId>jakarta.mail</groupId>
+      <artifactId>jakarta.mail-api</artifactId>
     </dependency>
 
     <dependency>
-      <groupId>org.jmockit</groupId>
-      <artifactId>jmockit</artifactId>
+      <groupId>jakarta.activation</groupId>
+      <artifactId>jakarta.activation-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
 
     <dependency>
-      <groupId>com.sun.mail</groupId>
+      <groupId>org.eclipse.angus</groupId>
       <artifactId>pop3</artifactId>
-      <version>1.4.4</version>
       <scope>test</scope>
     </dependency>
 
     <dependency>
-      <groupId>com.sun.mail</groupId>
+      <groupId>org.eclipse.angus</groupId>
       <artifactId>smtp</artifactId>
-      <version>1.4.4</version>
       <scope>test</scope>
     </dependency>
 
